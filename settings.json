@@ -1,0 +1,11 @@
+{
+  "theme": "dark",
+  "defaultProvider": "xai",
+  "defaultModel": "grok-4.6",
+  "defaultThinkingLevel": "medium",
+  "modelThinkingLevels": {
+    "xai/grok-4.6": "medium"
+  },
+  "enableInstallTelemetry": false,
+  "lastChangelogVersion": "0.85.1"
+}

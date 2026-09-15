@@ -1,0 +1,14 @@
+auth.json
+.env
+.env.*
+!.env.example
+models.json
+sessions/
+npm/
+git/
+bin/
+node_modules/
+*.log
+mcp-cache.json
+trust.json
+models-store.json
