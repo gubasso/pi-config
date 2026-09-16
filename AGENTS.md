@@ -12,6 +12,12 @@ Placeholder. Machine-wide instructions for every pi session on this account. Rep
 - Read before writing; state what was verified and what was assumed.
 - Ask before anything hard to reverse or outward-facing.
 
+## Larger work
+
+Skip this path for a small, obvious edit.
+
+For a multi-step goal: collaborate on a plan (`/plan`) before mutating; keep one atomic `todo` list with `dependsOn`; delegate isolated implement or review work to subagents. Do not mark mutating work done on the implementer's say-so — run a real check (`gate` on the child, or an independent reviewer).
+
 ## Talking to other sessions
 
 Sessions on this machine reach each other through pi-intercom.
