@@ -10,6 +10,7 @@
   "lastChangelogVersion": "0.85.1",
   "packages": [
     "npm:pi-web-access",
-    "npm:pi-subagents"
+    "npm:pi-subagents",
+    "npm:@narumitw/pi-plan-mode"
   ]
 }

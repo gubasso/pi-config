@@ -13,3 +13,5 @@ layers on top of this file.
 - Prefer the smallest change that answers the request.
 - Read before writing; state what was verified and what was assumed.
 - Ask before anything hard to reverse or outward-facing.
+- Non-secret Pi plugin config is sourced from the pi-config clone, not from files created only under the live agent directory.
+- Plugin sidecars that can hold tokens stay live-only, like `auth.json`. Do not copy them into git.

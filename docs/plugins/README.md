@@ -25,22 +25,52 @@ Do not use the live path, the npm folder, or a slogan as the name.
 
 ## Files inside each directory
 
-Keep it flat. Two required documents, optional extras as sibling
+Keep it flat. Three required documents, optional extras as sibling
 `.md` files, no nested package folders.
 
 | File | Required | What it is |
 | --- | --- | --- |
 | `README.md` | yes | Index: pin, upstream, one-line landing, links |
-| `SPEC.md` | yes | Binding landing: sidecar class, copy / symlink / live-only |
+| `SPEC.md` | yes | Binding landing: each sidecar, class, why |
+| `sidecars.json` | yes | Machine contract `just deploy` / `just doctor` read |
 | `<topic>.md` | no | Extra research that is not the landing contract |
 
 `README.md` does not repeat the SPEC. `SPEC.md` does not narrate
-install (that is the guide). Do not put secrets, `npm/` trees, or
-live `web-search.json` here. These paths are not deployed.
+install (that is the guide). Do not put secrets or `npm/` trees
+here. These paths are not deployed.
+
+`sidecars.json` lists every live-agent-dir config file the package
+reads, including leftover names we refuse to create. Schema:
+
+```json
+{
+  "sidecars": [
+    {
+      "path": "relative/to/agent-dir.json",
+      "class": "live-only | symlink | copy",
+      "sensitive": false,
+      "runtimeWrites": true,
+      "required": true,
+      "followsSymlinks": true
+    }
+  ]
+}
+```
+
+`path` is relative to the live agent dir and to this clone. No `..`.
+`sensitive: true` requires `class: live-only`. `runtimeWrites: true`
+requires `class: symlink`, unless `followsSymlinks` is false, in
+which case `class` must be `copy` and deploy lands a hardlink
+(3-way sync against HEAD). `required` defaults to true for `copy` /
+`symlink` and is always false for `live-only`. Optional `copy` /
+`symlink` rows may omit the source file until we author one.
+
+An empty `sidecars` array means the package was checked and has no
+agent-dir config files.
 
 ## Current packages
 
 Do not list pins here. Source of truth is `settings.json`
 `packages`. Each pin has a directory named by the rules above.
-`just check` proves the pairing. `just status` reports whether
-the live tree exists.
+`just check` proves the pairing and sidecar classes. `just status`
+reports whether the live tree and each sidecar dest exist.

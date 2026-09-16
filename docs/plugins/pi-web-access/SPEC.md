@@ -1,6 +1,8 @@
 # pi-web-access landing
 
-Verified against installed 0.29.0 on this host.
+Verified against installed 0.29.0 and upstream README
+https://github.com/nicobailon/pi-web-access (config lives in
+`web-search.json`).
 
 ## Pin and tree
 
@@ -9,7 +11,7 @@ Verified against installed 0.29.0 on this host.
 | Pin | `settings.json` `packages` → `npm:pi-web-access` | symlink already |
 | Install tree | no | `npm/node_modules/pi-web-access` |
 
-## Sidecar
+## Sidecars
 
 Live path when `PI_CODING_AGENT_DIR` is unset:
 `$HOME/.pi/agent/web-search.json`.
@@ -17,7 +19,8 @@ Live path when `PI_CODING_AGENT_DIR` is unset:
 Resolver (`utils.ts`): `PI_CODING_AGENT_DIR` first; else existing
 `XDG_CONFIG_HOME/pi/web-search.json`; else existing legacy
 `~/.pi/web-search.json`; else `~/.pi/agent`. New files go in the
-agent dir when neither env is set.
+agent dir when neither env is set. Missing file is valid
+(zero-config Exa MCP / Codex auth).
 
 The file is mixed:
 
@@ -28,22 +31,16 @@ The file is mixed:
 | Live state | `/curator` on/off, curator provider dropdown | the package |
 
 Keys may be literals, `$NAME` / `${NAME}`, or `!/path/to/cmd`.
-Env vars such as `BRAVE_API_KEY` override literals. The package
-does not echo file text on parse errors.
+Env vars such as `BRAVE_API_KEY` override literals.
 
-Cache: live `web-search-cache/`. Never git.
+Cache: live `web-search-cache/`. Not a sidecar. Never git.
 
 ## Class
 
-| Artifact | Class |
-| --- | --- |
-| `web-search.json` | live only, mode `0600` if created; gitignored |
-| `web-search.example.json` | not yet (no shared policy) |
-| `web-search-cache/` | live only; gitignored |
+| Artifact | Class | Why |
+| --- | --- | --- |
+| `web-search.json` | `live-only` | Can hold tokens; runtime also writes curator state. Sensitive wins. |
 
-Do not symlink live `web-search.json` while it can hold literal
-keys and while `/curator` would dirty this clone. Do not copy it
-on every `just deploy`.
-
-Create the live file only when adding keys or routing. After
+Do not create `web-search.json` in this clone. Create the live
+file only when adding keys or routing, mode `0600`. After
 install, `/reload` or start a new session.

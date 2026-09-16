@@ -1,7 +1,7 @@
 # Host landing for this source tree.
-# Nix installs the pi binary. Static payloads are copied. Files Pi
-# mutates but this repo tracks (settings.json, keybindings.json) are
-# symlinked so /settings writes through to git.
+# Nix installs the pi binary. Static payloads are copied. Files the
+# runtime mutates but this repo tracks (settings.json, keybindings.json,
+# classified plugin sidecars) are symlinked so writes go through to git.
 
 src := justfile_directory()
 
@@ -91,6 +91,7 @@ deploy:
     if [ -f "$src/keybindings.json" ]; then
       link_tracked "$src/keybindings.json" "$dest/keybindings.json"
     fi
+    python3 "$src/scripts/package-pins.py" land-sidecars "$src" "$dest"
 
     just doctor
 
@@ -122,7 +123,7 @@ doctor:
     python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$src/settings.json" || fail "settings.json is not JSON"
     ok "settings.json json"
 
-    python3 "$src/scripts/package-pins.py" prove-docs "$src" "$dest" || fail "plugin docs pairing"
+    python3 "$src/scripts/package-pins.py" prove-sidecars "$src" "$dest" || fail "plugin docs or sidecars"
 
     if [ -L "$src/AGENTS.md" ]; then
       t="$(readlink -f "$src/AGENTS.md" 2>/dev/null || readlink "$src/AGENTS.md")"

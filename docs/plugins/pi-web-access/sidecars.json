@@ -1,0 +1,10 @@
+{
+  "sidecars": [
+    {
+      "path": "web-search.json",
+      "class": "live-only",
+      "sensitive": true,
+      "runtimeWrites": true
+    }
+  ]
+}

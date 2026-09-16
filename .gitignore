@@ -1,7 +1,7 @@
 auth.json
 web-search.json
 web-search-cache/
-extensions/subagent/config.json
+plan-mode.json
 .env
 .env.*
 !.env.example
