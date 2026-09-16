@@ -2,6 +2,13 @@ auth.json
 web-search.json
 web-search-cache/
 plan-mode.json
+intercom/broker.sock
+intercom/broker.pid
+intercom/broker.port.json
+intercom/broker.spawn.lock
+intercom/broker-launch.vbs
+intercom/pending-asks/
+intercom/extension-state/
 .env
 .env.*
 !.env.example

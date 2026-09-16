@@ -11,6 +11,7 @@
   "packages": [
     "npm:pi-web-access",
     "npm:pi-subagents",
-    "npm:@narumitw/pi-plan-mode"
+    "npm:@narumitw/pi-plan-mode",
+    "npm:pi-intercom"
   ]
 }

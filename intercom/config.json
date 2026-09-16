@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "inboundTrigger": "replies",
+  "confirmSend": true,
+  "replyHint": true
+}
