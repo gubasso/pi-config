@@ -32,8 +32,8 @@
         in
         {
           default = pkgs.mkShell {
-            # Every package here backs a recipe in the justfile or a
-            # `language: system` hook in .pre-commit-config.yaml. A system
+            # Every package here backs a recipe, a `language: system` hook,
+            # or a language server the agent uses on this tree. A system
             # hook resolves off PATH and gets no environment of its own, so
             # this list is the only thing that can supply it. `just
             # devshell-check` is the executable form of that claim.
@@ -52,7 +52,7 @@
               # The formatter of record for markdown and JSON. dprint.json
               # lists what it must not touch.
               dprint
-              # scripts/package-pins.py.
+              # scripts/package-pins.py (CLI + `ruff server`).
               ruff
               typos
               committed
@@ -65,6 +65,16 @@
               statix
               deadnix
               jq
+              # Language servers pi-lsp-client probes on PATH for the
+              # languages this repository actually contains. Do not add a
+              # server for a language that is not here.
+              pyright # .py types (`pyright-langserver`)
+              nixd # .nix
+              yaml-language-server # .pre-commit-config.yaml
+              bash-language-server # .envrc and justfile recipes
+              taplo # .toml (`taplo lsp stdio`); not a pi-lsp-client builtin
+              vscode-langservers-extracted # .json/.jsonc
+              marksman # .md; not a pi-lsp-client builtin
             ];
 
             # The greeting goes to standard error, because `nix develop

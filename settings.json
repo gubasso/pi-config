@@ -13,6 +13,8 @@
     "npm:pi-subagents",
     "npm:@narumitw/pi-plan-mode",
     "npm:pi-intercom",
-    "npm:@99percentpeople/pi-todo"
+    "npm:@99percentpeople/pi-todo",
+    "git:github.com/code-yeongyu/pi-lsp-client@1c981dfcacc456fe4ce9f4120a2f0250b54d6844",
+    "git:github.com/code-yeongyu/pi-ast-grep@4a7d1beee684d96a6890e5fc55710bb63fecca85"
   ]
 }

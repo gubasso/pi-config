@@ -1,0 +1,11 @@
+{
+  "sidecars": [
+    {
+      "path": "lsp-client.json",
+      "root": "pi-home",
+      "class": "copy",
+      "sensitive": false,
+      "runtimeWrites": false
+    }
+  ]
+}

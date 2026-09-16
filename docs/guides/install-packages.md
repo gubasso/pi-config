@@ -4,16 +4,24 @@ Operator procedure for third-party Pi packages on this machine. The contract is 
 
 Pi has no separate plugin type. A package is an npm or git unit that ships extensions, skills, prompts, or themes. The pin lives in this repo. The install tree does not. Every plugin config file is classified and landed from this repo.
 
+## Choose first
+
+Selection policy: [package-selection.md](./package-selection.md). Contract: [SPEC.md](../../SPEC.md) §9.
+
+Pick the package that makes the model more precise, deterministic, and effective at the job, with token-sane tool results. Popularity, maturity, and compatibility with the other pins are clues. Do not pick a package because it matches the current deploy layout, and do not reject one because landing it would require a refactor. Layout is downstream of the pin.
+
+Do not install two packages that register the same tool names for the same job.
+
 ## What belongs where
 
-| Thing                       | Home                                                            |
-| --------------------------- | --------------------------------------------------------------- |
-| Pin (`npm:…`, `git:…`)      | `settings.json` `packages` in this clone                        |
-| Install tree                | live `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/npm/` (or `git/`) |
-| `copy` / `symlink` sidecars | this clone, same relative path as live; deploy lands them       |
-| `live-only` sidecars        | live agent dir only; gitignored; this clone stays blind         |
-| Plugin findings             | `docs/plugins/<plugin-name>/` in this clone, not deployed       |
-| Plugin cache                | live agent dir, never git                                       |
+| Thing                       | Home                                                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Pin (`npm:…`, `git:…`)      | `settings.json` `packages` in this clone                                                                   |
+| Install tree                | live `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/npm/` (or `git/`)                                            |
+| `copy` / `symlink` sidecars | this clone, same relative path as live (or `$HOME/.pi/<path>` when `root` is `pi-home`); deploy lands them |
+| `live-only` sidecars        | live agent dir only; gitignored; this clone stays blind                                                    |
+| Plugin findings             | `docs/plugins/<plugin-name>/` in this clone, not deployed                                                  |
+| Plugin cache                | live agent dir, never git                                                                                  |
 
 `settings.json` is already a symlink from the live dir into this clone. `pi install` writes the pin here. `just deploy` does not run `pi install` and does not copy `npm/`. It does land classified sidecars.
 

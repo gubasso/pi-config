@@ -1,0 +1,22 @@
+{
+  "lsp": {
+    "biome": {
+      "disabled": true
+    },
+    "jsonls": {
+      "command": ["vscode-json-language-server", "--stdio"],
+      "extensions": [".json", ".jsonc"],
+      "priority": 50
+    },
+    "taplo": {
+      "command": ["taplo", "lsp", "stdio"],
+      "extensions": [".toml"],
+      "priority": 50
+    },
+    "marksman": {
+      "command": ["marksman", "server"],
+      "extensions": [".md"],
+      "priority": 50
+    }
+  }
+}

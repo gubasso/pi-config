@@ -121,6 +121,7 @@ pi-config/                          # source tree (clone lives anywhere)
 ├── keybindings.json                # tracked; live path is a symlink
 ├── pi-plan-mode.json               # plugin sidecar; hardlink at dest
 ├── 99extensions.json               # plugin sidecar; hardlink at dest
+├── lsp-client.json                 # plugin sidecar; copy to ~/.pi/ (root pi-home)
 ├── models.example.json             # committed template
 │
 ├── docs/
@@ -280,9 +281,19 @@ Do not treat `pi install git:github.com/<you>/pi-config` as the primary distribu
 
 Pi has no separate “plugin” type. Shareable units are **packages**: extensions, skills, prompt templates, themes. Others install them with `pi install` into the live agent dir. Operator steps: [docs/guides/install-packages.md](./docs/guides/install-packages.md). Per-package findings: [docs/plugins/](./docs/plugins/README.md).
 
+### Choosing a package
+
+Pick the package that makes the model more precise, deterministic, and effective at the job. Token-sane results (bounded output, no junk tools, no prompt dump) are part of that job. Popularity, maturity, and compatibility with the rest of the stack are clues. They are not a veto. Operator manuals: [docs/guides/package-selection.md](./docs/guides/package-selection.md), [docs/guides/lsp.md](./docs/guides/lsp.md).
+
+Do **not** choose, keep, or reject a package because it fits or does not fit the current layout of this repo, the live agent dir, deploy, or an existing sidecar class. Layout is downstream of the pin. If a better package needs a deploy change, a new config root, a greenfield pin, or a refactor of how we land files, do that work. Setup cost, refactor cost, and greenfield cost are not selection criteria.
+
+Sidecar classification below is **how** a chosen package is landed. It is never a reason to keep a weaker package.
+
+Do not install two packages that register the same tool names for the same job.
+
 ### Sidecar config files
 
-This repository is SoT for **every** plugin config. A pin without a classified sidecar list is unfinished. Read upstream docs and the installed source, list every config file the package reads under the live agent dir, then land one class per file.
+This repository is SoT for **every** plugin config. A pin without a classified sidecar list is unfinished. Read upstream docs and the installed source, list every config file the package reads, then land one class per file. If the package reads a path outside the live agent dir, extend deploy to land that path from this clone. Do not reject the package. Do not vendor the package source into this git tree to dodge the path.
 
 Classes:
 
@@ -300,7 +311,7 @@ Legacy names we do not own (`plan-mode.json` for pi-plan-mode) are also `live-on
 
 Caches (`web-search-cache/`, sessions, npm trees) are not sidecars. They stay live-only and gitignored.
 
-Machine contract: `docs/plugins/<plugin-name>/sidecars.json`. `just doctor` / `just check` prove it. `just deploy` lands `copy` and `symlink` rows from that file. Paths are relative to the live agent dir and to this clone.
+Machine contract: `docs/plugins/<plugin-name>/sidecars.json`. `just doctor` / `just check` prove it. `just deploy` lands `copy` and `symlink` rows from that file. `path` is relative to this clone. Dest is the live agent dir unless `root` is `pi-home`, in which case dest is `$HOME/.pi/<path>` (what the package actually reads). No `..`.
 
 Do not copy a `symlink` sidecar on every deploy. That clobbers live writes. `copy` plus `followsSymlinks: false` is the hardlink stand-in when the package cannot follow a link. Do not leave a non-secret sidecar unclassified or live-only “until we have a policy”: `{}` in this clone is a managed default.
 
@@ -409,6 +420,7 @@ A subdirectory inside `pi-config` (`packages/pi-foo`) is acceptable while incuba
 6. **Edit here, then deploy copies.** `/settings` and `pi install` mutate the clone through the symlink; commit those. Static payloads still need `just deploy` after you edit them. `/login` is never committed.
 7. **Personal glue stays; a named feature leaves.**
 8. **Do not market this repo as a drop-in for strangers.** They can read it. They should not `pi install` your home. Host landing is `just deploy` for this operator.
+9. **Choose packages for the model, not for the current layout.** The pin is the one that makes the agent more precise, deterministic, and effective, with token-sane tool results. Popularity, maturity, and compatibility with the rest of the stack are clues. The cost of changing this repo is not a selection criterion. Sidecar classification (§9) lands a chosen package; it does not decide which package wins.
 
 ---
 
@@ -466,7 +478,7 @@ Pi loads global `AGENTS.md` from the live agent directory **and** from the proje
 
 ## 14. Development environment
 
-`flake.nix` and `.envrc` are the source of truth for every tool a recipe or a hook calls by name. `.pre-commit-config.yaml` is the source of truth for the gates themselves. Nix owns the runtimes; pre-commit owns the hooks.
+`flake.nix` and `.envrc` are the source of truth for every tool a recipe or a hook calls by name, and for every language server the agent uses on this tree. `.pre-commit-config.yaml` is the source of truth for the gates themselves. Nix owns the runtimes and those servers; pre-commit owns the hooks. Do not add a language server for a language this repository does not contain.
 
 ### Enter the shell
 
@@ -512,6 +524,7 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Deploying `AGENTS.override.md`, `auth.json`, or session transcripts
 - Committing `auth.json` because “it is config”
 - Vendoring live `npm/` or `git/` into this git tree
+- Choosing or rejecting a package because it would require a deploy, sidecar, or layout refactor
 - Leaving a plugin pin without `docs/plugins/<name>/sidecars.json`
 - Treating the live agent dir as SoT for a non-secret plugin sidecar
 - Symlinking a sidecar that can hold tokens
@@ -540,6 +553,7 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Shareable add-ons are packages named `pi-<feature>`, usually separate repositories.
 - The repository name is `pi-config`.
 - Global `packages` pins are SoT in source `settings.json`. `just check` / `just doctor` prove each pin has `docs/plugins/<name>/` (README, SPEC, sidecars.json) and that each sidecar class is landed. `just status` reports live trees and sidecar dest state. Missing trees are notes, not doctor failures. Names are derived from pins; recipes do not hardcode plugin ids.
+- Package selection is effectiveness-first (precision, determinism, token-sane tools). Fit to the current pi-config layout is not a criterion and must not become one. Popularity, maturity, and compatibility are clues. Setup, refactor, and greenfield cost are not vetoes.
 - Reversed: pointing `PI_CODING_AGENT_DIR` at the clone, and treating the clone as the directory Pi mutates.
 - `flake.nix` and `.envrc` supply the toolchain; `.pre-commit-config.yaml` holds the gates. The two never merge: no `git-hooks.nix`, no `flake-parts`, no `treefmt-nix`. A gate is readable without evaluating Nix, and the shell is buildable without running a gate.
 - dprint formats markdown and JSON, except the JSON Pi writes at runtime. The runtime owns the bytes of a file it writes.

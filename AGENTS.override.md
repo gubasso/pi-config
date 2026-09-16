@@ -8,7 +8,15 @@ This working tree is the **source** of global Pi config, not the live agent dire
 - Never commit `auth.json`, live-only sidecars, session transcripts, or install trees.
 - Never deploy this override file.
 
-See `SPEC.md`.
+See `SPEC.md`. Package selection: [docs/guides/package-selection.md](docs/guides/package-selection.md). LSP pin: [docs/guides/lsp.md](docs/guides/lsp.md).
+
+## Choosing a plugin
+
+Never choose, keep, or reject a plugin because it fits or does not fit the current sidecar taxonomy, deploy, or live-agent-dir layout. That is not a criterion and must not become one.
+
+The criterion is: the package that makes the model more precise, deterministic, and effective at the job, with token-sane results. Popularity, maturity, usability, and compatibility with the other pins are clues. If a better package needs a refactor or a greenfield landing, do that. Setup cost, refactor cost, and greenfield cost are not selection criteria.
+
+Sidecar classification below is how a chosen package is landed.
 
 ## Install or change a plugin
 

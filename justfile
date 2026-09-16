@@ -17,14 +17,15 @@ hooks:
 lint:
     pre-commit run --all-files
 
-# Prove the devShell supplies every tool a recipe or a hook calls by name
+# Prove the devShell supplies every tool a recipe, a hook, or an LSP this tree uses
 devshell-check:
     #!/usr/bin/env bash
     set -euo pipefail
     missing=()
     for t in just pre-commit python3 node dprint ruff typos committed \
              gitleaks ripsecrets lychee editorconfig-checker nixfmt \
-             statix deadnix jq; do
+             statix deadnix jq pyright-langserver nixd yaml-language-server \
+             bash-language-server taplo vscode-json-language-server marksman; do
       if command -v "$t" >/dev/null 2>&1; then
         echo "ok  $t"
       else

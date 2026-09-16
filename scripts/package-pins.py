@@ -19,8 +19,10 @@ import sys
 from urllib.parse import urlparse
 
 SIDECAR_CLASSES = {"live-only", "symlink", "copy"}
+SIDECAR_ROOTS = {"agent", "pi-home"}
 SIDECAR_KEYS = {
     "path",
+    "root",
     "class",
     "sensitive",
     "runtimeWrites",
@@ -141,6 +143,21 @@ def relpath_ok(path: str) -> bool:
     return all(p and p not in (".", "..") for p in parts)
 
 
+def sidecar_root(row: dict[str, object]) -> str:
+    return str(row.get("root") or "agent")
+
+
+def sidecar_source_path(src: str, rel: str) -> str:
+    return os.path.join(src, rel)
+
+
+def sidecar_dest_path(dest: str, row: dict[str, object]) -> str:
+    rel = str(row["path"])
+    if sidecar_root(row) == "pi-home":
+        return os.path.join(os.path.expanduser("~"), ".pi", rel)
+    return os.path.join(dest, rel)
+
+
 def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object]]:
     path = os.path.join(plugin_docs_dir(src, name), "sidecars.json")
     if not os.path.isfile(path):
@@ -161,18 +178,24 @@ def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object
             raise SystemExit(f"{path} sidecars[{i}] unknown keys: {sorted(extra)}")
         rel = entry.get("path")
         klass = entry.get("class")
+        root = entry.get("root", "agent")
         if not isinstance(rel, str) or not relpath_ok(rel):
             raise SystemExit(
                 f"{path} sidecars[{i}] path must be a relative path with no .."
             )
         rel = rel.replace("\\", "/")
+        if root not in SIDECAR_ROOTS:
+            raise SystemExit(
+                f"{path} sidecars[{i}] root must be one of {sorted(SIDECAR_ROOTS)}"
+            )
         if klass not in SIDECAR_CLASSES:
             raise SystemExit(
                 f"{path} sidecars[{i}] class must be one of {sorted(SIDECAR_CLASSES)}"
             )
-        if rel in seen:
-            raise SystemExit(f"{path} duplicate sidecar path {rel}")
-        seen.add(rel)
+        key = f"{root}:{rel}"
+        if key in seen:
+            raise SystemExit(f"{path} duplicate sidecar path {rel} root {root}")
+        seen.add(key)
         sensitive = entry.get("sensitive", False)
         runtime = entry.get("runtimeWrites", False)
         if sensitive not in (True, False) or runtime not in (True, False):
@@ -211,6 +234,7 @@ def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object
                 "plugin": name,
                 "pin": pin,
                 "path": rel,
+                "root": root,
                 "class": klass,
                 "sensitive": bool(sensitive),
                 "runtimeWrites": bool(runtime),
@@ -227,11 +251,12 @@ def load_sidecars(src: str, pins: list[dict[str, str]]) -> list[dict[str, object
     for pin in pins:
         for row in load_plugin_sidecars(src, pin["name"], pin["pin"]):
             rel = str(row["path"])
-            if rel in seen_paths:
+            key = f"{sidecar_root(row)}:{rel}"
+            if key in seen_paths:
                 raise SystemExit(
-                    f"duplicate sidecar path {rel} ({seen_paths[rel]} and {row['pin']})"
+                    f"duplicate sidecar path {rel} root {sidecar_root(row)} ({seen_paths[key]} and {row['pin']})"
                 )
-            seen_paths[rel] = str(row["pin"])
+            seen_paths[key] = str(row["pin"])
             rows.append(row)
     return rows
 
@@ -411,7 +436,7 @@ def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
     for row in sidecars:
         rel = str(row["path"])
         klass = str(row["class"])
-        source_path = os.path.join(src, rel)
+        source_path = sidecar_source_path(src, rel)
         if klass == "live-only":
             if os.path.lexists(source_path):
                 raise SystemExit(f"live-only sidecar must not exist in source: {rel}")
@@ -440,8 +465,8 @@ def prove_sidecars_landing(
     for row in sidecars:
         rel = str(row["path"])
         klass = str(row["class"])
-        source_path = os.path.join(src, rel)
-        dest_path = os.path.join(dest, rel)
+        source_path = sidecar_source_path(src, rel)
+        dest_path = sidecar_dest_path(dest, row)
         if klass == "live-only":
             if os.path.islink(dest_path):
                 raise SystemExit(f"live-only sidecar {rel} is a symlink at dest")
@@ -491,8 +516,8 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
     for row in sidecars:
         rel = str(row["path"])
         klass = str(row["class"])
-        source_path = os.path.join(src, rel)
-        dest_path = os.path.join(dest, rel)
+        source_path = sidecar_source_path(src, rel)
+        dest_path = sidecar_dest_path(dest, row)
         if klass == "live-only":
             continue
         if not os.path.isfile(source_path):
@@ -543,15 +568,17 @@ def print_status(
         print(f"package {row['pin']} docs {docs_state} tree {tree_state}")
     for row in sidecars:
         rel = str(row["path"])
-        dest_path = os.path.join(dest, rel) if dest else ""
+        dest_path = sidecar_dest_path(dest, row) if dest else ""
         if dest_path and os.path.islink(dest_path):
             state = "symlink"
         elif dest_path and os.path.isfile(dest_path):
-            source_path = os.path.join(src, rel)
+            source_path = sidecar_source_path(src, rel)
             state = "hardlink" if same_inode(source_path, dest_path) else "file"
         else:
             state = "no"
-        print(f"sidecar {rel} class {row['class']} dest {state}")
+        root = sidecar_root(row)
+        root_bit = f" root {root}" if root != "agent" else ""
+        print(f"sidecar {rel}{root_bit} class {row['class']} dest {state}")
 
 
 def note_trees(pins: list[dict[str, str]]) -> None:

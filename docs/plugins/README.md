@@ -2,7 +2,9 @@
 
 One directory per third-party Pi package this operator installs. Humans and coding agents read it before changing the pin, a sidecar file, or deploy.
 
-Repo contract: [SPEC.md](../../SPEC.md). Install steps: [guides/install-packages.md](../guides/install-packages.md).
+Repo contract: [SPEC.md](../../SPEC.md). Selection: [guides/package-selection.md](../guides/package-selection.md). Install steps: [guides/install-packages.md](../guides/install-packages.md). LSP: [guides/lsp.md](../guides/lsp.md).
+
+These directories record **how** a chosen pin is landed. They do not decide which package wins. Fit to an existing sidecar class is not a selection criterion.
 
 ## Directory name
 
@@ -31,13 +33,14 @@ Keep it flat. Three required documents, optional extras as sibling `.md` files, 
 
 `README.md` does not repeat the SPEC. `SPEC.md` does not narrate install (that is the guide). Do not put secrets or `npm/` trees here. These paths are not deployed.
 
-`sidecars.json` lists every live-agent-dir config file the package reads, including leftover names we refuse to create. Schema:
+`sidecars.json` lists every config file the package reads that this clone must classify, including leftover names we refuse to create. Schema:
 
 ```json
 {
   "sidecars": [
     {
-      "path": "relative/to/agent-dir.json",
+      "path": "relative/to-clone.json",
+      "root": "agent | pi-home",
       "class": "live-only | symlink | copy",
       "sensitive": false,
       "runtimeWrites": true,
@@ -48,9 +51,9 @@ Keep it flat. Three required documents, optional extras as sibling `.md` files, 
 }
 ```
 
-`path` is relative to the live agent dir and to this clone. No `..`. `sensitive: true` requires `class: live-only`. `runtimeWrites: true` requires `class: symlink`, unless `followsSymlinks` is false, in which case `class` must be `copy` and deploy lands a hardlink (3-way sync against HEAD). `required` defaults to true for `copy` / `symlink` and is always false for `live-only`. Optional `copy` / `symlink` rows may omit the source file until we author one.
+`path` is relative to this clone. No `..`. `root` defaults to `agent` (dest is the live agent dir). `pi-home` dest is `$HOME/.pi/<path>`. `sensitive: true` requires `class: live-only`. `runtimeWrites: true` requires `class: symlink`, unless `followsSymlinks` is false, in which case `class` must be `copy` and deploy lands a hardlink (3-way sync against HEAD). `required` defaults to true for `copy` / `symlink` and is always false for `live-only`. Optional `copy` / `symlink` rows may omit the source file until we author one.
 
-An empty `sidecars` array means the package was checked and has no agent-dir config files.
+An empty `sidecars` array means the package was checked and has no config files this clone lands.
 
 ## Current packages
 
