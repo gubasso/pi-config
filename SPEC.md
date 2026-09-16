@@ -120,6 +120,7 @@ pi-config/                          # source tree (clone lives anywhere)
 ├── settings.json                   # tracked; live path is a symlink
 ├── keybindings.json                # tracked; live path is a symlink
 ├── pi-plan-mode.json               # plugin sidecar; hardlink at dest
+├── 99extensions.json               # plugin sidecar; hardlink at dest
 ├── models.example.json             # committed template
 │
 ├── docs/
@@ -495,7 +496,7 @@ A hook whose upstream language is rust, go, or python with a prebuilt wheel runs
 
 dprint is the formatter of record for markdown and JSON, with `textWrap: "never"`. Prose is one physical line per paragraph.
 
-`dprint.json` excludes the JSON that Pi writes at runtime: `settings.json`, `pi-plan-mode.json`, `intercom/config.json`, and `extensions/**/config.json`. Two reasons. Pi rewrites those files itself, so a formatter fights the runtime on every write. A formatter also replaces a file atomically, which breaks the hardlink a `followsSymlinks: false` sidecar depends on (§9).
+`dprint.json` excludes the JSON that Pi writes at runtime: `settings.json`, `pi-plan-mode.json`, `99extensions.json`, `intercom/config.json`, and `extensions/**/config.json`. Two reasons. Pi rewrites those files itself, so a formatter fights the runtime on every write. A formatter also replaces a file atomically, which breaks the hardlink a `followsSymlinks: false` sidecar depends on (§9).
 
 The three whitespace fixers in `.pre-commit-config.yaml` carry the same exclude list, under the YAML anchor `runtime_owned`. Pi writes `settings.json` with no trailing newline. A fixer that adds one is undone on Pi's next write, and the two trade that byte forever. Add a new runtime-written file to both lists at once.
 

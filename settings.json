@@ -12,6 +12,7 @@
     "npm:pi-web-access",
     "npm:pi-subagents",
     "npm:@narumitw/pi-plan-mode",
-    "npm:pi-intercom"
+    "npm:pi-intercom",
+    "npm:@99percentpeople/pi-todo"
   ]
 }

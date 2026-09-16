@@ -1,0 +1,11 @@
+{
+  "sidecars": [
+    {
+      "path": "99extensions.json",
+      "class": "copy",
+      "sensitive": false,
+      "runtimeWrites": true,
+      "followsSymlinks": false
+    }
+  ]
+}

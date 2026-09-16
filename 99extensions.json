@@ -1,0 +1,7 @@
+{
+  "todo": {
+    "collapsedTaskLimit": 3,
+    "showDependencyNumbers": true,
+    "reminderInterval": 3
+  }
+}
