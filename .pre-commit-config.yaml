@@ -1,0 +1,229 @@
+# Gates for the pi-config source tree.
+#
+# Per-stage budget:
+#   pre-commit : fast, local, deterministic.
+#   pre-push   : slower and network-aware (link check, full-history secrets).
+#   commit-msg : message content, on top of the global grammar hook.
+#
+# What each tool owns:
+#   pre-commit-hooks    : whitespace, line endings, basic safety.
+#   check-json5         : JSON and JSONC syntax, comments included.
+#   editorconfig-checker: honor .editorconfig.
+#   dprint              : the formatter of record for markdown and JSON.
+#                         dprint.json lists the runtime-owned files it must
+#                         not touch.
+#   markdownlint-cli2   : style gate beyond dprint, plus the one autofix
+#                         dprint cannot do (MD029 renumbering).
+#   ruff                : scripts/package-pins.py.
+#   nixfmt/statix/deadnix: flake.nix.
+#   typos, ripsecrets   : spelling and staged-diff secrets.
+#   gitleaks            : full-history secret scan, at push time.
+#   lychee              : link check, at push time.
+#   just check          : this repository's own contract — no tracked secret,
+#                         gitignore coverage, every plugin sidecar classified.
+#   committed           : subject and body length, punctuation, case.
+#
+# Every hook whose upstream language is rust, go, or python-with-a-prebuilt
+# wheel runs `language: system` and takes its binary from the devShell. Those
+# wheels ship a dynamically linked binary whose ELF interpreter
+# /lib64/ld-linux-x86-64.so.2 does not exist on this host. The `rev` still
+# pins the hook definition; flake.nix pins the binary.
+#
+# Install every stage with `just hooks`.
+
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+
+repos:
+  # --- Housekeeping ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # The three whitespace fixers skip the JSON Pi writes at runtime, for
+      # the same reason dprint.json excludes it. Pi writes settings.json with
+      # no trailing newline; a fixer that adds one is undone on Pi's next
+      # write, and the pair trade the same byte forever. The exclude list is
+      # the one in dprint.json.
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md] # keep two-space hard breaks
+        exclude: &runtime_owned '^(settings\.json|keybindings\.json|pi-plan-mode\.json|intercom/config\.json|extensions/.*/config\.json)$'
+      - id: end-of-file-fixer
+        exclude: *runtime_owned
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: *runtime_owned
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: destroyed-symlinks
+      - id: check-yaml
+      - id: check-toml
+      - id: detect-private-key
+
+  # --- JSON and JSONC syntax ---
+  #
+  # check-json5 parses JSON that is valid JSON5, comments and trailing commas
+  # included, so it does not false-fail on .markdownlint-cli2.jsonc. It is the
+  # syntax gate only; formatting belongs to the dprint json plugin.
+  - repo: https://gitlab.com/bmares/check-json5
+    rev: v1.0.1
+    hooks:
+      - id: check-json5
+
+  # --- EditorConfig ---
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker
+    rev: v4.0.1
+    hooks:
+      - id: editorconfig-checker
+        alias: ec
+        language: system
+        # end-of-file-fixer owns final-newline enforcement; do not double-gate.
+        args: [-disable-insert-final-newline]
+        # Markdown whitespace belongs to dprint, and .editorconfig opts *.md
+        # out of trailing-whitespace trimming.
+        exclude: '\.md$'
+
+  # --- Formatters and linters that resolve off PATH ---
+  - repo: local
+    hooks:
+      - id: dprint
+        name: dprint fmt
+        entry: dprint fmt
+        language: system
+        types_or: [markdown, json]
+        files: '\.(md|json|jsonc)$'
+
+      - id: nixfmt
+        name: nixfmt
+        entry: nixfmt
+        language: system
+        files: '\.nix$'
+      - id: statix
+        name: statix check
+        entry: statix check
+        language: system
+        files: '\.nix$'
+        pass_filenames: false
+      - id: deadnix
+        name: deadnix
+        entry: deadnix --fail
+        language: system
+        files: '\.nix$'
+
+      - id: just-fmt
+        name: just --fmt --check
+        entry: just --unstable --fmt --check
+        language: system
+        files: '^justfile$'
+        pass_filenames: false
+
+      - id: pi-config-check
+        name: pi-config source proofs
+        entry: just check
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+
+  # --- Markdown style gate ---
+  #
+  # Runs after dprint. The node comes from the devShell through
+  # `language_version: system`, so pre-commit does not download one.
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.23.2
+    hooks:
+      - id: markdownlint-cli2
+        language_version: system
+        additional_dependencies: ['markdownlint-rule-relative-links']
+
+  # --- Explicit relative links ---
+  #
+  # A bare-filename relative link like [x](README.md) is ambiguous: the same
+  # basename exists in many directories here, so neither a reader nor a tool
+  # can tell which file is meant, and the link rots silently when a file
+  # moves. Require ./name, ../dir/name, or a multi-segment dir/name.
+  - repo: local
+    hooks:
+      - id: no-bare-relative-links
+        name: inline markdown links must be explicit (./, ../, or a path)
+        language: pygrep
+        types: [markdown]
+        entry: '\]\((?!https?://|ftp://|mailto:|tel:|/|#|\.\.?/)[^)/\s:]+\.[A-Za-z0-9]+(?:#[^)]*)?\)'
+      - id: no-bare-relative-link-defs
+        name: markdown link definitions must be explicit (./, ../, or a path)
+        language: pygrep
+        types: [markdown]
+        entry: '^\s*\[[^\]]+\]:\s+(?!https?://|ftp://|mailto:|tel:|/|#|\.\.?/|<)[^\s/:#]+\.[A-Za-z0-9]+'
+
+  # --- Python ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+        language: system
+        entry: ruff check --force-exclude
+        args: [--fix]
+      - id: ruff-format
+        language: system
+        entry: ruff format --force-exclude
+
+  # --- Spelling (report only) ---
+  #
+  # No --write-changes: an automatic rewrite silently edits a deliberate
+  # identifier. Fix a real typo by hand, allowlist a false positive in
+  # _typos.toml.
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.50.2
+    hooks:
+      - id: typos
+        language: system
+        args: [--force-exclude]
+
+  # --- Secrets ---
+  #
+  # This tree sits one directory away from auth.json, so the secret gate is
+  # layered: ripsecrets on the staged diff, gitleaks over the whole history
+  # before a push.
+  - repo: https://github.com/sirwart/ripsecrets
+    rev: v0.1.11
+    hooks:
+      - id: ripsecrets
+        language: system
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        language: system
+        stages: [pre-push]
+
+  # --- Link check (network, push time only) ---
+  #
+  # Arguments stay minimal so lychee.toml owns the behavior. The cache file
+  # .lycheecache is gitignored.
+  - repo: https://github.com/lycheeverse/lychee
+    rev: lychee-v0.24.2
+    hooks:
+      - id: lychee-system
+        stages: [pre-push]
+        types: [markdown]
+        args: [--no-progress]
+
+  # --- Commit message content ---
+  #
+  # The configured global hook ~/.config/git/hooks/commit-msg-conventional
+  # owns the grammar. committed adds the 72-column, lowercase and
+  # no-trailing-period rules. Source of truth: committed.toml.
+  - repo: https://github.com/crate-ci/committed
+    rev: v1.1.11
+    hooks:
+      - id: committed
+        language: system
+        stages: [commit-msg]
+
+  # --- Keep this file honest ---
+  - repo: meta
+    hooks:
+      - id: check-hooks-apply
+      - id: check-useless-excludes

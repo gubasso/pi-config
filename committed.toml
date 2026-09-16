@@ -1,0 +1,26 @@
+# Commit message content rules. The grammar itself belongs to the configured
+# global commit-msg hook; this file adds the length and punctuation rules that
+# hook deliberately leaves alone.
+#
+# Scope policy: a scope is preferred, written as `area/subarea`, and stays
+# optional. `allowed_scopes` is intentionally unset so a hierarchical
+# `a/b/c` scope passes.
+style = "conventional"
+subject_length = 72 # description after `type(scope): `
+line_length = 72 # full subject line AND body lines (classic 50/72)
+subject_capitalized = false # CC convention: lowercase description after the colon
+subject_not_punctuated = true # no trailing period
+imperative_subject = false # heuristic mood check off -> avoids false positives
+allowed_types = [
+  "feat",
+  "fix",
+  "docs",
+  "style",
+  "refactor",
+  "perf",
+  "test",
+  "build",
+  "ci",
+  "chore",
+  "revert",
+]

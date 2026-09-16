@@ -1,0 +1,15 @@
+# One script lives under scripts/. Keep the rule set small enough to read.
+line-length = 88
+
+[lint]
+select = [
+  "E", # pycodestyle
+  "F", # pyflakes
+  "I", # import order
+  "UP", # pyupgrade
+  "B", # bugbear
+]
+
+# `ruff format` owns line length. It cannot split a long message string, so
+# E501 only ever fires on a literal the formatter deliberately left alone.
+ignore = ["E501"]

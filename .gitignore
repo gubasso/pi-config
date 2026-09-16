@@ -19,6 +19,14 @@ git/
 bin/
 node_modules/
 *.log
+
+# Nix / direnv
+.direnv/
+/.envrc.local
+/result
+
+# lychee link-check verdict cache
+.lycheecache
 mcp-cache.json
 trust.json
 models-store.json

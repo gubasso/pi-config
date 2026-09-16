@@ -1,0 +1,19 @@
+# Link checker settings. lychee reads this file from the repository root, so
+# the pre-push hook passes only --no-progress and this file owns the behavior.
+
+# The docs cite pi.dev, npm and GitHub. Two retries absorb a flaky hop without
+# turning a push into a long wait.
+max_retries = 2
+timeout = 20
+max_concurrency = 8
+
+# Cache the verdicts between pushes. .lycheecache is gitignored.
+cache = true
+max_cache_age = "2d"
+
+# localhost and RFC 1918 targets never resolve from another machine.
+exclude_all_private = true
+
+# GitHub answers an unauthenticated HEAD with 429 under load, and some sites
+# refuse HEAD outright. Neither means the link is dead.
+accept = ["200", "204", "206", "429"]

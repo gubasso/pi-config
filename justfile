@@ -9,11 +9,39 @@ src := justfile_directory()
 default:
     @just --list
 
+# Install the git hooks for every stage .pre-commit-config.yaml declares
+hooks:
+    pre-commit install --install-hooks
+
+# Run every gate over the whole tree
+lint:
+    pre-commit run --all-files
+
+# Prove the devShell supplies every tool a recipe or a hook calls by name
+devshell-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    missing=()
+    for t in just pre-commit python3 node dprint ruff typos committed \
+             gitleaks ripsecrets lychee editorconfig-checker nixfmt \
+             statix deadnix jq; do
+      if command -v "$t" >/dev/null 2>&1; then
+        echo "ok  $t"
+      else
+        missing+=("$t")
+      fi
+    done
+    if [ ${#missing[@]} -gt 0 ]; then
+      echo "missing from PATH: ${missing[*]}" >&2
+      echo "add them to flake.nix and re-enter the devShell" >&2
+      exit 1
+    fi
+
 # Land owned artifacts into the live agent directory
 deploy:
     #!/usr/bin/env bash
     set -euo pipefail
-    src="{{src}}"
+    src="{{ src }}"
     dest="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 
     store_owned() {
@@ -99,13 +127,13 @@ deploy:
 doctor:
     #!/usr/bin/env bash
     set -euo pipefail
-    src="{{src}}"
+    src="{{ src }}"
     dest="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 
     fail() { echo "doctor: $*" >&2; exit 1; }
     ok() { echo "ok  $*"; }
 
-    for f in SPEC.md settings.json AGENTS.md AGENTS.override.md prompts/review.md .gitignore package.json; do
+    for f in SPEC.md settings.json AGENTS.md AGENTS.override.md prompts/review.md .gitignore package.json flake.nix .envrc .pre-commit-config.yaml; do
       [ -f "$src/$f" ] || fail "missing $src/$f"
       ok "source $f"
     done
@@ -203,7 +231,7 @@ doctor:
 status:
     #!/usr/bin/env bash
     set -euo pipefail
-    src="{{src}}"
+    src="{{ src }}"
     dest="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
     echo "source $src"
     echo "dest $dest"
@@ -243,7 +271,7 @@ status:
 check:
     #!/usr/bin/env bash
     set -euo pipefail
-    src="{{src}}"
+    src="{{ src }}"
     DOCTOR_SOURCE_ONLY=1 just doctor
     git -C "$src" ls-files -z | while IFS= read -r -d '' f; do
       case "$f" in

@@ -1,0 +1,31 @@
+# EditorConfig for the pi-config source tree.
+# Markdown formatting is owned by dprint and markdownlint, and
+# editorconfig-checker excludes *.md, so no markdown indent block is set here.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,json5,jsonc,yaml,yml,toml}]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+# A recipe body is indented four spaces, and the shell inside it is indented
+# two more. No single indent_size describes both, so only the style is set.
+[justfile]
+indent_style = space
+
+[*.nix]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off

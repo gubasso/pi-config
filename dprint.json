@@ -1,0 +1,27 @@
+{
+  "markdown": {
+    "textWrap": "never"
+  },
+  "json": {
+    "indentWidth": 2
+  },
+  "includes": [
+    "**/*.md",
+    "**/*.json",
+    "**/*.jsonc"
+  ],
+  "excludes": [
+    ".git",
+    ".direnv",
+    "node_modules",
+    "result",
+    "settings.json",
+    "pi-plan-mode.json",
+    "intercom/config.json",
+    "extensions/**/config.json"
+  ],
+  "plugins": [
+    "https://plugins.dprint.dev/markdown-0.22.0.wasm",
+    "https://plugins.dprint.dev/json-0.23.0.wasm"
+  ]
+}
