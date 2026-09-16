@@ -19,7 +19,14 @@ import sys
 from urllib.parse import urlparse
 
 SIDECAR_CLASSES = {"live-only", "symlink", "copy"}
-SIDECAR_KEYS = {"path", "class", "sensitive", "runtimeWrites", "required", "followsSymlinks"}
+SIDECAR_KEYS = {
+    "path",
+    "class",
+    "sensitive",
+    "runtimeWrites",
+    "required",
+    "followsSymlinks",
+}
 
 
 def source_of(entry: object) -> str:
@@ -61,7 +68,13 @@ def parse_git(source: str) -> tuple[str, str] | None:
     return None
 
 
-def plugin_name(source: str, kind: str, *, npm: str | None = None, git: tuple[str, str] | None = None) -> str:
+def plugin_name(
+    source: str,
+    kind: str,
+    *,
+    npm: str | None = None,
+    git: tuple[str, str] | None = None,
+) -> str:
     if kind == "npm":
         assert npm is not None
         return npm.lstrip("@").replace("/", "-").lower()
@@ -105,7 +118,9 @@ def load_pins(src: str, dest: str) -> list[dict[str, str]]:
         if not name:
             raise SystemExit(f"pin {pin} produced an empty plugin name")
         if name in seen_names:
-            raise SystemExit(f"duplicate plugin docs name {name} ({seen_names[name]} and {pin})")
+            raise SystemExit(
+                f"duplicate plugin docs name {name} ({seen_names[name]} and {pin})"
+            )
         seen_names[name] = pin
         pins.append({"pin": pin, "name": name, "kind": kind, "tree": tree})
     return pins
@@ -147,17 +162,23 @@ def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object
         rel = entry.get("path")
         klass = entry.get("class")
         if not isinstance(rel, str) or not relpath_ok(rel):
-            raise SystemExit(f"{path} sidecars[{i}] path must be a relative path with no ..")
+            raise SystemExit(
+                f"{path} sidecars[{i}] path must be a relative path with no .."
+            )
         rel = rel.replace("\\", "/")
         if klass not in SIDECAR_CLASSES:
-            raise SystemExit(f"{path} sidecars[{i}] class must be one of {sorted(SIDECAR_CLASSES)}")
+            raise SystemExit(
+                f"{path} sidecars[{i}] class must be one of {sorted(SIDECAR_CLASSES)}"
+            )
         if rel in seen:
             raise SystemExit(f"{path} duplicate sidecar path {rel}")
         seen.add(rel)
         sensitive = entry.get("sensitive", False)
         runtime = entry.get("runtimeWrites", False)
         if sensitive not in (True, False) or runtime not in (True, False):
-            raise SystemExit(f"{path} sidecars[{i}] sensitive/runtimeWrites must be booleans")
+            raise SystemExit(
+                f"{path} sidecars[{i}] sensitive/runtimeWrites must be booleans"
+            )
         if "required" in entry and entry["required"] not in (True, False):
             raise SystemExit(f"{path} sidecars[{i}] required must be a boolean")
         follows = entry.get("followsSymlinks", True)
@@ -170,15 +191,21 @@ def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object
         else:
             required = True
         if sensitive and klass != "live-only":
-            raise SystemExit(f"{path} sidecars[{i}] sensitive files must be class live-only")
+            raise SystemExit(
+                f"{path} sidecars[{i}] sensitive files must be class live-only"
+            )
         if follows is False and klass != "copy":
-            raise SystemExit(f"{path} sidecars[{i}] followsSymlinks false requires class copy")
+            raise SystemExit(
+                f"{path} sidecars[{i}] followsSymlinks false requires class copy"
+            )
         if runtime and klass == "copy" and follows is not False:
             raise SystemExit(
                 f"{path} sidecars[{i}] runtimeWrites files must be class symlink unless followsSymlinks is false"
             )
         if klass == "symlink" and follows is False:
-            raise SystemExit(f"{path} sidecars[{i}] cannot symlink when followsSymlinks is false")
+            raise SystemExit(
+                f"{path} sidecars[{i}] cannot symlink when followsSymlinks is false"
+            )
         rows.append(
             {
                 "plugin": name,
@@ -201,7 +228,9 @@ def load_sidecars(src: str, pins: list[dict[str, str]]) -> list[dict[str, object
         for row in load_plugin_sidecars(src, pin["name"], pin["pin"]):
             rel = str(row["path"])
             if rel in seen_paths:
-                raise SystemExit(f"duplicate sidecar path {rel} ({seen_paths[rel]} and {row['pin']})")
+                raise SystemExit(
+                    f"duplicate sidecar path {rel} ({seen_paths[rel]} and {row['pin']})"
+                )
             seen_paths[rel] = str(row["pin"])
             rows.append(row)
     return rows
@@ -248,7 +277,9 @@ def prove_nofollow_regular(path: str, rel: str) -> None:
     try:
         fd = os.open(path, flags)
     except OSError as exc:
-        raise SystemExit(f"dest {rel} cannot be opened without following symlinks: {exc}") from exc
+        raise SystemExit(
+            f"dest {rel} cannot be opened without following symlinks: {exc}"
+        ) from exc
     try:
         info = os.fstat(fd)
     finally:
@@ -289,7 +320,9 @@ def same_inode(left: str, right: str) -> bool:
         right_stat = os.stat(right)
     except OSError:
         return False
-    return left_stat.st_dev == right_stat.st_dev and left_stat.st_ino == right_stat.st_ino
+    return (
+        left_stat.st_dev == right_stat.st_dev and left_stat.st_ino == right_stat.st_ino
+    )
 
 
 def copy_regular(source_path: str, dest_path: str) -> None:
@@ -401,7 +434,9 @@ def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
             print(f"ok  sidecar optional-absent {klass} {rel}")
 
 
-def prove_sidecars_landing(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
+def prove_sidecars_landing(
+    src: str, dest: str, sidecars: list[dict[str, object]]
+) -> None:
     for row in sidecars:
         rel = str(row["path"])
         klass = str(row["class"])
@@ -469,7 +504,9 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
         os.makedirs(os.path.dirname(dest_path) or dest, exist_ok=True)
         if klass == "symlink":
             if os.path.isdir(dest_path) and not os.path.islink(dest_path):
-                raise SystemExit(f"refusing to replace directory {dest_path} with a symlink")
+                raise SystemExit(
+                    f"refusing to replace directory {dest_path} with a symlink"
+                )
             if os.path.lexists(dest_path):
                 os.remove(dest_path)
             os.symlink(os.path.abspath(source_path), dest_path)
@@ -486,7 +523,9 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
         print(f"copied {dest_path}")
 
 
-def print_status(src: str, dest: str, pins: list[dict[str, str]], sidecars: list[dict[str, object]]) -> None:
+def print_status(
+    src: str, dest: str, pins: list[dict[str, str]], sidecars: list[dict[str, object]]
+) -> None:
     if not pins:
         print("packages none")
         return
@@ -522,7 +561,10 @@ def note_trees(pins: list[dict[str, str]]) -> None:
             print(f"ok  package tree {row['pin']}")
             continue
         missing = True
-        print(f"note: package {row['pin']} tree missing; run pi update --extensions", file=sys.stderr)
+        print(
+            f"note: package {row['pin']} tree missing; run pi update --extensions",
+            file=sys.stderr,
+        )
     if not missing and pins:
         print("ok  package trees")
 
