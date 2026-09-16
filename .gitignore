@@ -1,4 +1,6 @@
 auth.json
+web-search.json
+web-search-cache/
 .env
 .env.*
 !.env.example

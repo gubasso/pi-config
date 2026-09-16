@@ -1,6 +1,7 @@
 # Host landing for this source tree.
-# Nix installs the pi binary. These recipes copy owned files into the
-# directory Pi already reads and prove the contract.
+# Nix installs the pi binary. Static payloads are copied. Files Pi
+# mutates but this repo tracks (settings.json, keybindings.json) are
+# symlinked so /settings writes through to git.
 
 src := justfile_directory()
 
@@ -8,30 +9,21 @@ src := justfile_directory()
 default:
     @just --list
 
-# Copy owned artifacts into the live agent directory
-deploy *args:
+# Land owned artifacts into the live agent directory
+deploy:
     #!/usr/bin/env bash
     set -euo pipefail
     src="{{src}}"
     dest="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
-    force_settings=0
-    if [ "${1:-}" = "--settings" ]; then
-      force_settings=1
-    elif [ -n "${1:-}" ]; then
-      echo "unknown argument: $1 (expected --settings)" >&2
-      exit 1
-    fi
 
     store_owned() {
       local p="$1"
-      [ -e "$p" ] || [ -L "$p" ] || return 1
-      if [ -L "$p" ]; then
-        local t
-        t="$(readlink -f "$p" 2>/dev/null || readlink "$p")"
-        case "$t" in
-          */nix/store*) return 0 ;;
-        esac
-      fi
+      [ -L "$p" ] || return 1
+      local t
+      t="$(readlink -f "$p" 2>/dev/null || readlink "$p")"
+      case "$t" in
+        */nix/store*) return 0 ;;
+      esac
       return 1
     }
 
@@ -42,28 +34,45 @@ deploy *args:
       echo "Thin the pi-coding-agent module, activate, then rerun just deploy." >&2
       exit 1
     fi
-    if [ -e "$dest/settings.json" ] || [ -L "$dest/settings.json" ]; then
-      if store_owned "$dest/settings.json"; then
-        echo "Home Manager still owns $dest/settings.json (store symlink)." >&2
-        echo "Thin the pi-coding-agent module, activate, then rerun just deploy." >&2
-        exit 1
-      fi
+    if store_owned "$dest/settings.json"; then
+      echo "Home Manager still owns $dest/settings.json (store symlink)." >&2
+      exit 1
     fi
 
     copy_file() {
       install -m 0644 "$1" "$2"
-      echo "wrote $2"
+      echo "copied $2"
     }
 
     copy_dir_files() {
       local from="$1" to="$2"
+      if [ -L "$to" ]; then
+        rm -f "$to"
+      fi
       mkdir -p "$to"
       local f
       for f in "$from"/*; do
         [ -f "$f" ] || continue
         install -m 0644 "$f" "$to/$(basename "$f")"
-        echo "wrote $to/$(basename "$f")"
+        echo "copied $to/$(basename "$f")"
       done
+    }
+
+    link_tracked() {
+      local from="$1" to="$2"
+      if store_owned "$to"; then
+        echo "Home Manager still owns $to (store symlink)." >&2
+        exit 1
+      fi
+      if [ -d "$to" ] && [ ! -L "$to" ]; then
+        echo "refusing to replace directory $to with a symlink" >&2
+        exit 1
+      fi
+      if [ -e "$to" ] || [ -L "$to" ]; then
+        rm -f "$to"
+      fi
+      ln -sfn "$from" "$to"
+      echo "linked $to -> $from"
     }
 
     copy_file "$src/AGENTS.md" "$dest/AGENTS.md"
@@ -78,11 +87,9 @@ deploy *args:
       copy_file "$src/APPEND_SYSTEM.md" "$dest/APPEND_SYSTEM.md"
     fi
 
-    if [ ! -e "$dest/keybindings.json" ] && [ -f "$src/keybindings.json" ]; then
-      copy_file "$src/keybindings.json" "$dest/keybindings.json"
-    fi
-    if [ "$force_settings" -eq 1 ] || [ ! -e "$dest/settings.json" ]; then
-      copy_file "$src/settings.json" "$dest/settings.json"
+    link_tracked "$src/settings.json" "$dest/settings.json"
+    if [ -f "$src/keybindings.json" ]; then
+      link_tracked "$src/keybindings.json" "$dest/keybindings.json"
     fi
 
     just doctor
@@ -102,12 +109,12 @@ doctor:
       ok "source $f"
     done
 
-    for line in auth.json sessions/ npm/ git/ bin/ models.json trust.json; do
+    for line in auth.json web-search.json web-search-cache/ sessions/ npm/ git/ bin/ models.json trust.json; do
       grep -qxF "$line" "$src/.gitignore" || fail ".gitignore missing $line"
     done
     ok "gitignore lines"
 
-    for p in auth.json sessions/foo npm/foo git/foo bin/foo models.json trust.json models-store.json; do
+    for p in auth.json web-search.json web-search-cache/foo sessions/foo npm/foo git/foo bin/foo models.json trust.json models-store.json; do
       git -C "$src" check-ignore -q --no-index "$p" || fail "not ignored: $p"
     done
     ok "check-ignore"
@@ -151,17 +158,31 @@ doctor:
       return 1
     }
 
+    linked_to() {
+      local p="$1" want="$2" label="$3"
+      [ -L "$p" ] || fail "$label is not a symlink"
+      store_owned "$p" && fail "$label is a store symlink"
+      local got wantp
+      got="$(readlink -f "$p")"
+      wantp="$(readlink -f "$want")"
+      [ "$got" = "$wantp" ] || fail "$label -> $got, want $wantp"
+      ok "$label symlink"
+    }
+
     [ -f "$dest/AGENTS.md" ] && [ ! -L "$dest/AGENTS.md" ] || fail "dest AGENTS.md is not a regular file"
     store_owned "$dest/AGENTS.md" && fail "dest AGENTS.md is a store symlink"
     cmp -s "$src/AGENTS.md" "$dest/AGENTS.md" || fail "dest AGENTS.md does not match source"
-    ok "dest AGENTS.md"
+    ok "dest AGENTS.md copy"
 
     [ -f "$dest/prompts/review.md" ] && [ ! -L "$dest/prompts/review.md" ] || fail "dest prompts/review.md is not a regular file"
+    [ ! -L "$dest/prompts" ] || fail "dest prompts/ is a symlink; want a copied directory"
     cmp -s "$src/prompts/review.md" "$dest/prompts/review.md" || fail "dest prompts/review.md does not match source"
-    ok "dest prompts/review.md"
+    ok "dest prompts/review.md copy"
 
-    [ -f "$dest/settings.json" ] && [ ! -L "$dest/settings.json" ] || fail "dest settings.json is not a regular file"
-    ok "dest settings.json"
+    linked_to "$dest/settings.json" "$src/settings.json" "dest settings.json"
+    if [ -f "$src/keybindings.json" ]; then
+      linked_to "$dest/keybindings.json" "$src/keybindings.json" "dest keybindings.json"
+    fi
 
     [ ! -e "$dest/AGENTS.override.md" ] || fail "dest AGENTS.override.md must not exist"
     ok "dest has no AGENTS.override.md"
@@ -186,27 +207,26 @@ status:
     else
       echo "PI_CODING_AGENT_DIR (unset)"
     fi
-    if [ -L "$dest/AGENTS.md" ]; then
-      t="$(readlink -f "$dest/AGENTS.md" 2>/dev/null || readlink "$dest/AGENTS.md")"
-      case "$t" in
-        */nix/store*) echo "dest AGENTS.md store-symlink" ;;
-        *) echo "dest AGENTS.md symlink" ;;
-      esac
-    elif [ -e "$dest/AGENTS.md" ]; then
-      echo "dest AGENTS.md yes"
-    else
-      echo "dest AGENTS.md no"
-    fi
-    if [ -e "$dest/settings.json" ]; then
-      echo "dest settings.json yes"
-    else
-      echo "dest settings.json no"
-    fi
-    if [ -e "$dest/auth.json" ]; then
-      echo "dest auth.json yes"
-    else
-      echo "dest auth.json no"
-    fi
+
+    describe() {
+      local p="$1" name="$2"
+      if [ -L "$p" ]; then
+        local t
+        t="$(readlink -f "$p" 2>/dev/null || readlink "$p")"
+        case "$t" in
+          */nix/store*) echo "$name store-symlink" ;;
+          *) echo "$name symlink $t" ;;
+        esac
+      elif [ -e "$p" ]; then
+        echo "$name file"
+      else
+        echo "$name no"
+      fi
+    }
+
+    describe "$dest/AGENTS.md" "dest AGENTS.md"
+    describe "$dest/settings.json" "dest settings.json"
+    describe "$dest/auth.json" "dest auth.json"
     if command -v pi >/dev/null 2>&1; then
       echo "pi $(command -v pi)"
     else
@@ -221,7 +241,7 @@ check:
     DOCTOR_SOURCE_ONLY=1 just doctor
     git -C "$src" ls-files -z | while IFS= read -r -d '' f; do
       case "$f" in
-        auth.json|models.json|trust.json|models-store.json|sessions/*|npm/*|git/*|bin/*)
+        auth.json|web-search.json|web-search-cache/*|models.json|trust.json|models-store.json|sessions/*|npm/*|git/*|bin/*)
           echo "tracked secret or install tree: $f" >&2
           exit 1
           ;;
