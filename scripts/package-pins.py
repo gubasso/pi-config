@@ -8,6 +8,7 @@ docs/plugins/<name>/sidecars.json. Nothing is hardcoded.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -291,19 +292,41 @@ def same_inode(left: str, right: str) -> bool:
     return left_stat.st_dev == right_stat.st_dev and left_stat.st_ino == right_stat.st_ino
 
 
+def copy_regular(source_path: str, dest_path: str) -> None:
+    shutil.copyfile(source_path, dest_path)
+    os.chmod(dest_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+
+def hardlink_supported(source_path: str, dest_dir: str) -> bool:
+    """Probe the pair, because st_dev lies across btrfs subvolumes."""
+    if os.stat(source_path).st_dev != os.stat(dest_dir).st_dev:
+        return False
+    probe = os.path.join(dest_dir, f".pi-config-link-probe.{os.getpid()}")
+    try:
+        os.link(source_path, probe)
+    except OSError as exc:
+        if exc.errno == errno.EXDEV:
+            return False
+        raise
+    finally:
+        if os.path.lexists(probe):
+            os.remove(probe)
+    return True
+
+
 def replace_with_hardlink(source_path: str, dest_path: str) -> str:
     if os.path.isdir(dest_path) and not os.path.islink(dest_path):
         raise SystemExit(f"refusing to replace directory {dest_path} with a hardlink")
-    if os.path.lexists(dest_path):
-        os.remove(dest_path)
     dest_dir = os.path.dirname(dest_path) or "."
     os.makedirs(dest_dir, exist_ok=True)
-    if os.stat(source_path).st_dev == os.stat(dest_dir).st_dev:
+    linkable = hardlink_supported(source_path, dest_dir)
+    if os.path.lexists(dest_path):
+        os.remove(dest_path)
+    if linkable:
         os.link(source_path, dest_path)
-        return "hardlink"
-    shutil.copyfile(source_path, dest_path)
-    os.chmod(dest_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-    return "copy"
+        return "hardlinked"
+    copy_regular(source_path, dest_path)
+    return "copied"
 
 
 def land_atomic_sot(src: str, rel: str, source_path: str, dest_path: str) -> None:
@@ -313,16 +336,16 @@ def land_atomic_sot(src: str, rel: str, source_path: str, dest_path: str) -> Non
     base = git_head_bytes(src, rel)
     if dest_bytes is None or dest_bytes == source_bytes:
         kind = replace_with_hardlink(source_path, dest_path)
-        print(f"{kind}ed {dest_path}")
+        print(f"{kind} {dest_path}")
         return
     if base is not None and dest_bytes == base and source_bytes != base:
         kind = replace_with_hardlink(source_path, dest_path)
-        print(f"{kind}ed {dest_path} (pushed source)")
+        print(f"{kind} {dest_path} (pushed source)")
         return
     if base is not None and source_bytes == base and dest_bytes != base:
         write_bytes(source_path, dest_bytes)
         kind = replace_with_hardlink(source_path, dest_path)
-        print(f"imported {rel} dest -> source; {kind}ed {dest_path}")
+        print(f"imported {rel} dest -> source; {kind} {dest_path}")
         return
     raise SystemExit(
         f"sidecar {rel} conflict: source and dest differ"
@@ -416,9 +439,10 @@ def prove_sidecars_landing(src: str, dest: str, sidecars: list[dict[str, object]
         if row.get("followsSymlinks") is False:
             prove_nofollow_regular(dest_path, rel)
             dest_dir = os.path.dirname(dest_path) or dest
-            if os.stat(source_path).st_dev == os.stat(dest_dir).st_dev and not same_inode(
-                source_path, dest_path
-            ):
+            if not hardlink_supported(source_path, dest_dir):
+                print(f"ok  sidecar dest copy {rel} (cross-device; no hardlink)")
+                continue
+            if not same_inode(source_path, dest_path):
                 raise SystemExit(
                     f"dest {rel} is not a hardlink to source (atomic replace broke it); run just deploy"
                 )
@@ -458,8 +482,7 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
             raise SystemExit(f"refusing to replace directory {dest_path} with a copy")
         if os.path.lexists(dest_path):
             os.remove(dest_path)
-        shutil.copyfile(source_path, dest_path)
-        os.chmod(dest_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+        copy_regular(source_path, dest_path)
         print(f"copied {dest_path}")
 
 

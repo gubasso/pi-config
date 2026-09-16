@@ -356,6 +356,8 @@ looks like a regular file). That is the native stand-in for a
 symlink: TUI reads succeed; an atomic save breaks the hardlink;
 the next `just deploy` 3-way-syncs dest and source against HEAD,
 then restores the hardlink. Cross-device trees fall back to copy.
+Deploy probes one real link before it touches dest, because two
+btrfs subvolumes report one `st_dev` and still refuse `link()`.
 Conflict (both sides differ from HEAD) fails deploy until you copy
 the winner onto the other path.
 
