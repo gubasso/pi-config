@@ -1,0 +1,11 @@
+{
+  "sidecars": [
+    {
+      "path": "pi-review.json",
+      "class": "copy",
+      "sensitive": false,
+      "runtimeWrites": true,
+      "followsSymlinks": false
+    }
+  ]
+}

@@ -17,6 +17,7 @@
     "result",
     "settings.json",
     "pi-plan-mode.json",
+    "pi-review.json",
     "99extensions.json",
     "intercom/config.json",
     "extensions/**/config.json"
