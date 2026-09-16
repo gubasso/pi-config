@@ -9,6 +9,7 @@
   "enableInstallTelemetry": false,
   "lastChangelogVersion": "0.85.1",
   "packages": [
-    "npm:pi-web-access"
+    "npm:pi-web-access",
+    "npm:pi-subagents"
   ]
 }

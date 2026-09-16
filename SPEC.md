@@ -128,6 +128,7 @@ pi-config/                          # source tree (clone lives anywhere)
 ├── README.md
 ├── .gitignore
 ├── justfile                        # deploy / doctor / status / check
+├── scripts/package-pins.py         # derive pins; not deployed
 ├── package.json                    # private; optional pi manifest
 ├── tsconfig.json                   # for local TypeScript extensions
 ├── flake.nix                       # optional nix develop for extensions
@@ -164,7 +165,7 @@ pi-config/                          # source tree (clone lives anywhere)
 - symlink: `settings.json`, `keybindings.json` (when the source
   file exists). Pi's `writeFileSync` follows the link.
 - never: `AGENTS.override.md`, `SPEC.md`, `README.md`, `justfile`,
-  `package.json`, `.gitignore`, `.git/`, `docs/`, `auth.json`,
+  `scripts/`, `package.json`, `.gitignore`, `.git/`, `docs/`, `auth.json`,
   `trust.json`, `models.json`, `web-search.json`, `models-store.json`,
   `sessions/`, `npm/`, `git/`, `bin/`
 
@@ -506,8 +507,11 @@ repository's justfile becomes the writer.
    the live agent dir, mode `0600`.
 5. Copy `models.example.json` to live `models.json` if that file
    is untracked and this machine needs it.
-6. Run `pi`. Let it install `packages` from the live
-   `settings.json`.
+6. Materialize global packages. They are not installed on Pi
+   startup (that auto-install is project `.pi/` only).
+   `pi update --extensions`
+   If a pin is still missing, `pi install` that source from
+   `settings.json` `packages`.
 7. Do not copy `sessions/` or `auth.json` from another machine
    unless you intend to.
 
@@ -581,5 +585,10 @@ Do not deploy the override file.
 - Shareable add-ons are packages named `pi-<feature>`, usually
   separate repositories.
 - The repository name is `pi-config`.
+- Global `packages` pins are SoT in source `settings.json`.
+  `just check` / `just doctor` prove each pin has
+  `docs/plugins/<name>/`. `just status` reports live trees.
+  Missing trees are notes, not doctor failures. Names are
+  derived from pins; recipes do not hardcode plugin ids.
 - Reversed: pointing `PI_CODING_AGENT_DIR` at the clone, and
   treating the clone as the directory Pi mutates.

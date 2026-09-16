@@ -120,5 +120,7 @@ hot-reload on their own.
 
 ```bash
 just doctor
+just status
+just check
 git check-ignore -q --no-index npm/foo web-search.json
 ```

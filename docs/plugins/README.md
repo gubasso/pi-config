@@ -40,6 +40,7 @@ live `web-search.json` here. These paths are not deployed.
 
 ## Current packages
 
-| Directory | Pin |
-| --- | --- |
-| [pi-web-access](./pi-web-access/README.md) | `npm:pi-web-access` |
+Do not list pins here. Source of truth is `settings.json`
+`packages`. Each pin has a directory named by the rules above.
+`just check` proves the pairing. `just status` reports whether
+the live tree exists.

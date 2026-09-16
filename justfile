@@ -122,6 +122,8 @@ doctor:
     python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$src/settings.json" || fail "settings.json is not JSON"
     ok "settings.json json"
 
+    python3 "$src/scripts/package-pins.py" prove-docs "$src" "$dest" || fail "plugin docs pairing"
+
     if [ -L "$src/AGENTS.md" ]; then
       t="$(readlink -f "$src/AGENTS.md" 2>/dev/null || readlink "$src/AGENTS.md")"
       case "$t" in
@@ -194,6 +196,8 @@ doctor:
       ok "dest auth.json mode 600"
     fi
 
+    python3 "$src/scripts/package-pins.py" note-trees "$src" "$dest"
+
 # Show source, dest, and whether live files exist
 status:
     #!/usr/bin/env bash
@@ -227,6 +231,7 @@ status:
     describe "$dest/AGENTS.md" "dest AGENTS.md"
     describe "$dest/settings.json" "dest settings.json"
     describe "$dest/auth.json" "dest auth.json"
+    python3 "$src/scripts/package-pins.py" status "$src" "$dest"
     if command -v pi >/dev/null 2>&1; then
       echo "pi $(command -v pi)"
     else

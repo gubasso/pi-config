@@ -24,6 +24,6 @@ Per-package notes: [docs/plugins/](./docs/plugins/README.md).
 ## Commands
 
 - `just deploy` — copy static payloads; symlink live-writable tracked files
-- `just doctor` — prove the source tree, and the landing when dest exists
-- `just status` — show source, dest, and whether live files exist
+- `just doctor` — prove the source tree, plugin-docs pairing, and the landing when dest exists
+- `just status` — show source, dest, live files, and each pin vs docs vs tree
 - `just check` — source-tree proofs (safe without a host landing)
