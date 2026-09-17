@@ -270,7 +270,9 @@ This file is **repo tooling**, not “publish my home directory.”
 }
 ```
 
-The real file carries only `prompts`. Add a key when its directory exists.
+The real file carries `extensions` and `prompts`. Add a key when its directory exists.
+
+`"type": "module"` is set for Node, not for Pi. Node resolves a package context by walking up from the file it runs, so `scripts/check-worktree-guard.mjs` importing the extension under `home/.pi/agent/extensions/` lands on this manifest. Without the key Node warns on every run. Pi loads an extension through its own bundler and reads none of this.
 
 The paths point into the `home/` mirror, because that is where the resources live in this tree. A nested path under a dot directory is valid, and the reason is exact: `package-manager.js` treats an entry as a glob only when it contains `*` or `?`. Every other entry resolves with `resolve(root, entry)` and then walks that directory. Upstream states the rule at `package-manager.js:137`: "Glob entries discover visible paths; exact entries can target dot paths or symlinked trees."
 

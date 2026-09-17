@@ -1,8 +1,10 @@
 {
   "name": "pi-config",
   "private": true,
+  "type": "module",
   "keywords": ["pi-package"],
   "pi": {
+    "extensions": ["./home/.pi/agent/extensions"],
     "prompts": ["./home/.pi/agent/prompts"]
   }
 }

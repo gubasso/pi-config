@@ -13,6 +13,16 @@ Placeholder. Machine-wide instructions for every pi session on this account. Rep
 - Ask before anything hard to reverse or outward-facing.
 - When choosing or changing a Pi package: pick the one that makes the model more precise, deterministic, and effective at the job, with token-sane tool results. Popularity, maturity, and compatibility with the rest of the stack are clues, not a veto. Do not keep a weaker package to avoid changing config layout, deploy, or sidecar classes. Layout is downstream of the pin. Setup, refactor, and greenfield cost are not selection criteria. Write the pin as `npm:<name>` or `git:host/repo` with no version, no tag, and no SHA. Pi treats any git ref as frozen, and a frozen pin is left out of the startup update notice. Freeze only to hold back a known-bad upstream, and say in the commit message what removes the freeze.
 
+## Worktrees
+
+A worktree comes from a worktree tool, never from bash `git worktree`. Worktrunk owns the path, so a seat lands at `<repo>.ws/<repo>@<branch>` with every `/` in the branch flattened to `-`. A bare `git worktree add <path>` bypasses that template and leaves an off-convention seat.
+
+- Default to the `worktrunk` tool: `switch --create <branch>` opens a seat, `list` shows them, `merge` lands the branch, `remove` retires it.
+- A repository that lands its own worktree workflow keeps it. `rk worktree add <branch> --apply` is the verb in a release-kit target, and it seats the branch under that project's recorded checkout mode.
+- Name a branch in one of two forms. `<type>/<slug>` takes a Conventional Commit type, as in `feat/oauth-login`. `<issue-id>-<slug>` takes the id the forge minted, as in `412-empty-csv-upload` or `PROJ-412-empty-csv`. A form with no `/` flattens to itself, so the seat keeps the name.
+- `git worktree list` is read-only and stays open. Reach for it whenever you need the layout.
+- The `worktree-guard` extension blocks a mutating bash `git worktree` and names the replacement in the refusal. It is a gate, not a reminder. It keys on the word `git`, so `wt` and `rk worktree` pass untouched. One escape exists, per command: prefix with `PI_ALLOW_GIT_WORKTREE=1`, which `git worktree repair` needs because Worktrunk does not wrap that subcommand.
+
 ## Larger work
 
 Skip this path for a small, obvious edit.

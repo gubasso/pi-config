@@ -17,6 +17,11 @@ indent_size = 2
 indent_style = space
 indent_size = 4
 
+# Local Pi extensions under home/.pi/agent/extensions/.
+[*.ts]
+indent_style = space
+indent_size = 2
+
 # A recipe body is indented four spaces, and the shell inside it is indented
 # two more. No single indent_size describes both, so only the style is set.
 [justfile]

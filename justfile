@@ -145,7 +145,8 @@ doctor:
     done
     [ ! -e "$src/AGENTS.override.md" ] || fail "AGENTS.override.md was replaced by the root AGENTS.md; delete it"
 
-    for f in .pi/agent/settings.json .pi/agent/AGENTS.md .pi/agent/prompts/review.md .pi/lsp-client.json; do
+    for f in .pi/agent/settings.json .pi/agent/AGENTS.md .pi/agent/prompts/review.md \
+      .pi/agent/extensions/worktree-guard.ts .pi/lsp-client.json; do
       [ -f "$payload/$f" ] || fail "missing $payload/$f"
       ok "payload $f"
     done
@@ -238,6 +239,14 @@ doctor:
     cmp -s "$agent_src/prompts/review.md" "$dest/prompts/review.md" || fail "dest prompts/review.md does not match source"
     ok "dest prompts/review.md copy"
 
+    # The worktree guard is a gate, so a stale or missing copy is a silently
+    # open gate. Prove the landed file matches the source byte for byte.
+    [ -f "$dest/extensions/worktree-guard.ts" ] || fail "dest extensions/worktree-guard.ts is missing"
+    [ ! -L "$dest/extensions" ] || fail "dest extensions/ is a symlink; want a copied directory"
+    cmp -s "$agent_src/extensions/worktree-guard.ts" "$dest/extensions/worktree-guard.ts" \
+      || fail "dest extensions/worktree-guard.ts does not match source"
+    ok "dest extensions/worktree-guard.ts copy"
+
     linked_to "$dest/settings.json" "$agent_src/settings.json" "dest settings.json"
     if [ -f "$agent_src/keybindings.json" ]; then
       linked_to "$dest/keybindings.json" "$agent_src/keybindings.json" "dest keybindings.json"
@@ -316,3 +325,8 @@ check:
       esac
     done
     echo "ok  no tracked secrets"
+
+    # The guard keys on the word `git`, which is what keeps `wt` and
+    # `rk worktree add` open. A widened pattern would refuse the tools the
+    # rule routes work into, so the case table is a gate, not a comment.
+    node "$src/scripts/check-worktree-guard.mjs"
