@@ -16,6 +16,7 @@ import shutil
 import stat
 import subprocess
 import sys
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 SIDECAR_CLASSES = {"live-only", "symlink", "copy"}
@@ -698,9 +699,83 @@ def note_trees(pins: list[dict[str, str]]) -> None:
         print("ok  package trees")
 
 
+MANIFEST_NAME = ".pi-config-manifest.json"
+MANIFEST_VERSION = 1
+
+
+def manifest_path(dest: str) -> str:
+    return os.path.join(dest, MANIFEST_NAME)
+
+
+def read_run_manifest() -> list[tuple[str, str]]:
+    """The set of paths this deploy landed, as recorded by record()."""
+    run_manifest = os.environ.get("PI_CONFIG_RUN_MANIFEST")
+    if not run_manifest or not os.path.isfile(run_manifest):
+        raise SystemExit(
+            "converge: PI_CONFIG_RUN_MANIFEST is unset or missing. "
+            "A partial landing set would prune live files, so this is fatal."
+        )
+    rows: dict[str, str] = {}
+    with open(run_manifest, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            how, _, path = line.partition("\t")
+            if not path:
+                raise SystemExit(f"converge: malformed run manifest line: {line!r}")
+            rows[path] = how
+    return sorted(rows.items(), key=lambda kv: kv[0])
+
+
+def read_manifest(dest: str) -> list[dict[str, str]]:
+    """The previous deploy's paths. Missing or unreadable yields an empty list."""
+    path = manifest_path(dest)
+    if not os.path.isfile(path):
+        return []
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"note: {path} unreadable ({exc}); no prune this run", file=sys.stderr)
+        return []
+    if not isinstance(data, dict) or data.get("version") != MANIFEST_VERSION:
+        print(
+            f"note: {path} is not version {MANIFEST_VERSION}; no prune this run",
+            file=sys.stderr,
+        )
+        return []
+    rows = data.get("paths")
+    if not isinstance(rows, list):
+        print(f"note: {path} has no paths array; no prune this run", file=sys.stderr)
+        return []
+    out = []
+    for row in rows:
+        if isinstance(row, dict) and isinstance(row.get("path"), str):
+            out.append({"path": row["path"], "how": str(row.get("how") or "copy")})
+    return out
+
+
+def write_manifest(src: str, dest: str, landed: list[tuple[str, str]]) -> None:
+    payload = {
+        "version": MANIFEST_VERSION,
+        "deployedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": os.path.abspath(src),
+        "paths": [{"path": path, "how": how} for path, how in landed],
+    }
+    body = json.dumps(payload, indent=2) + "\n"
+    write_bytes(manifest_path(dest), body.encode("utf-8"))
+
+
+def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
+    """Record what this deploy landed. Pruning arrives in a later commit."""
+    landed = read_run_manifest()
+    write_manifest(src, dest, landed)
+    print(f"pi-config: files converged ({len(landed)} declared)")
+
+
 def usage() -> None:
     raise SystemExit(
-        "usage: package-pins.py emit|prove-docs|prove-sidecars|land-sidecars|status|note-trees SRC DEST"
+        "usage: package-pins.py emit|prove-docs|prove-sidecars|land-sidecars|converge|status|note-trees SRC DEST"
     )
 
 
@@ -731,6 +806,9 @@ def main() -> None:
         return
     if mode == "land-sidecars":
         land_sidecars(src, dest, sidecars)
+        return
+    if mode == "converge":
+        converge(src, dest, sidecars)
         return
     if mode == "status":
         print_status(src, dest, pins, sidecars)

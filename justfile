@@ -142,6 +142,7 @@ deploy:
       link_tracked "$agent_src/keybindings.json" "$dest/keybindings.json"
     fi
     python3 "$src/scripts/package-pins.py" land-sidecars "$src" "$dest"
+    python3 "$src/scripts/package-pins.py" converge "$src" "$dest"
 
     just doctor
 
