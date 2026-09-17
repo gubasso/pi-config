@@ -830,11 +830,81 @@ def manifest_source(dest: str) -> str:
     return str(data.get("source") or "") if isinstance(data, dict) else ""
 
 
+# Names Pi and its packages write into the live agent dir. Deploy never
+# creates any of them, so none can enter the manifest and prune cannot reach
+# them. This list is advisory only: it keeps the unmanaged scan quiet. A name
+# missing here costs a spurious note, never a deletion.
+RUNTIME_OWNED_NAMES = {
+    "auth.json",
+    "oauth.json",
+    "keybindings.json",
+    "models.json",
+    "models-store.json",
+    "trust.json",
+    "mcp-cache.json",
+    "web-search.json",
+    "plan-mode.json",
+    "pi-debug.log",
+    # pi-intercom broker runtime, which sits beside the one file deploy owns
+    # in intercom/. The scan reaches into managed directories, so these names
+    # must be honoured at every level, not only at the dest root.
+    "broker.sock",
+    "broker.pid",
+    "broker.port.json",
+    "broker.spawn.lock",
+    "broker-launch.vbs",
+}
+RUNTIME_OWNED_DIRS = {
+    "sessions",
+    "npm",
+    "git",
+    "bin",
+    "tmp",
+    "tools",
+    "web-search-cache",
+    "missions",
+}
+
+
 def prune_mode() -> str:
     mode = os.environ.get("PI_CONFIG_PRUNE", "apply")
-    if mode not in ("apply", "report"):
-        raise SystemExit(f"PI_CONFIG_PRUNE must be apply or report, got {mode!r}")
+    if mode not in ("apply", "report", "adopt"):
+        raise SystemExit(
+            f"PI_CONFIG_PRUNE must be apply, report or adopt, got {mode!r}"
+        )
     return mode
+
+
+def unmanaged_paths(
+    dest: str, landed: list[tuple[str, str]], protected: set[str]
+) -> list[str]:
+    """Files at the dest that deploy did not land and Pi does not own.
+
+    These predate the manifest, so prune cannot see them. They are reported,
+    and removed only by an explicit PI_CONFIG_PRUNE=adopt run.
+    """
+    dest_abs = os.path.abspath(dest)
+    known = {os.path.realpath(path) for path, _ in landed} | protected
+    managed_dirs = [path for path, how in landed if how == "dir"]
+    roots = [dest_abs] + managed_dirs
+    out = []
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for name in sorted(os.listdir(root)):
+            target = os.path.join(root, name)
+            if name in RUNTIME_OWNED_NAMES or name == MANIFEST_NAME:
+                continue
+            if name.endswith(".log"):
+                continue
+            if name in RUNTIME_OWNED_DIRS and os.path.isdir(target):
+                continue
+            if os.path.isdir(target) and not os.path.islink(target):
+                continue
+            if os.path.realpath(target) in known:
+                continue
+            out.append(target)
+    return sorted(set(out))
 
 
 def live_only_dests(dest: str, sidecars: list[dict[str, object]]) -> set[str]:
@@ -931,6 +1001,21 @@ def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
                 if exc.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOTDIR):
                     raise
                 print(f"  kept    not-empty {target}")
+
+    # Files that predate the manifest. Prune cannot see them, so they are
+    # reported every run and removed only by an explicit adopt.
+    unmanaged = unmanaged_paths(dest, landed, protected)
+    for target in unmanaged:
+        if mode == "adopt":
+            verdict = classify_stale(src, dest, target, "copy", protected)
+            if verdict != "prune":
+                print(f"  {verdict:<7} unmanaged {target}")
+                continue
+            os.remove(target)
+            pruned += 1
+            print(f"  adopted copy     {target}")
+        else:
+            print(f"  unmanaged        {target} (just deploy-adopt removes it)")
 
     if mode == "report":
         print("pi-config: report only; manifest not written")

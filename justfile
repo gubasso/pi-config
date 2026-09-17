@@ -150,6 +150,11 @@ deploy:
 deploy-report:
     PI_CONFIG_PRUNE=report just deploy
 
+# Land, then also remove the unmanaged files a plain deploy only reports.
+# One-shot, for a host landed before the deploy manifest existed.
+deploy-adopt:
+    PI_CONFIG_PRUNE=adopt just deploy
+
 # Prove the source tree, and the landing when dest exists
 doctor:
     #!/usr/bin/env bash
@@ -275,8 +280,8 @@ doctor:
       linked_to "$dest/keybindings.json" "$agent_src/keybindings.json" "dest keybindings.json"
     fi
 
-    # Migration guard for a host landed before the home/ move.
-    [ ! -e "$dest/AGENTS.override.md" ] || fail "dest AGENTS.override.md is stale; remove it"
+    # A stale AGENTS.override.md is no longer named here. The unmanaged scan
+    # reports any file deploy did not land, and just deploy-adopt removes it.
     if [ -f "$dest/AGENTS.md" ] && cmp -s "$src/AGENTS.md" "$dest/AGENTS.md"; then
       fail "dest AGENTS.md is the clone-rules file, not the payload"
     fi
