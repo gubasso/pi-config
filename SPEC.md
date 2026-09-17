@@ -88,8 +88,11 @@ There is no separate auth directory. Sessions, `npm/`, `git/`, `bin/`, `trust.js
 | Session JSONL                                                      | live agent dir `sessions/` (untracked)                                                       |
 | `npm/`, `git/`, `bin/` install trees                               | live agent dir; declared via source `settings.json` `packages`                               |
 | Plugin sidecar files                                               | **this repository** classifies and lands every one; see §9                                   |
+| Extent of the live agent dir                                       | **this repository**, via the deploy manifest; deploy removes what the repo stops declaring   |
 
 Home Manager must not write the agent directory. One writer per file: `just deploy` copies static payloads and creates the symlinks; Pi writes through those symlinks; Nix owns the binary.
+
+One owner of the _set_ of files, too. `just deploy` also removes what this repo stops declaring, so the extent of the live agent dir is this repository's, recorded in the deploy manifest (§5).
 
 ---
 
@@ -152,6 +155,9 @@ pi-config/                          # source tree (clone lives anywhere)
 - copy: `AGENTS.md`, `prompts/`, and each of `extensions/`, `themes/`, `skills/`, `agents/`, `APPEND_SYSTEM.md` that exists, plus every plugin sidecar classified `copy`
 - symlink: `settings.json`, `keybindings.json` (when the source file exists), plus every plugin sidecar classified `symlink`. Pi's `writeFileSync` follows the link.
 - never: anything outside `home/`. That is the whole rule. It covers the root `AGENTS.md`, `SPEC.md`, `README.md`, `justfile`, `scripts/`, `package.json`, `.gitignore`, `.git/`, and `docs/`. Inside `home/` it also excludes `auth.json`, `trust.json`, `models.json`, `models-store.json`, live-only plugin sidecars, `sessions/`, `npm/`, `git/`, and `bin/`, none of which this tree tracks.
+- prune: every path a previous `just deploy` recorded in `.pi-config-manifest.json` and this deploy did not create again. That is how a deleted prompt, a dropped sidecar row, and an unpinned package reach the host.
+
+The manifest lives at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/.pi-config-manifest.json`. It is written by deploy, read by the next deploy, and never tracked here. Deploy records it as a side effect of landing rather than recomputing it, because a recomputation would have to repeat the `live-only` and optional-absent skips, and a divergence there deletes a file deploy never landed.
 
 Pi will still create these in the **live** agent directory, never in the mirror:
 
@@ -164,11 +170,16 @@ sessions/
 npm/
 git/
 bin/
+tmp/
 trust.json
 mcp-cache.json
 models-store.json
+missions/
+intercom/broker.*
 *.log
 ```
+
+Deploy never creates any of these, so none of them can enter the manifest, so prune cannot reach them. The list documents the boundary. The manifest enforces it. `missions/` is written by the pi-subagents package and `intercom/broker.*` by pi-intercom, which is why neither is a sidecar.
 
 Do not invent alternate folder names (`lib/skills`, `plugins/`) inside `home/.pi/agent/` unless those paths are listed in `settings.json`. Stock names are the convention so deploy is a copy or a symlink of those paths.
 
@@ -321,11 +332,11 @@ This repository is SoT for **every** plugin config. A pin without a classified s
 
 Classes:
 
-| Class       | When                                                                                    | This repo                | `just deploy`         |
-| ----------- | --------------------------------------------------------------------------------------- | ------------------------ | --------------------- |
-| `live-only` | The file can hold tokens or other secrets, or it is a leftover name we refuse to create | absent; gitignored       | do not touch dest     |
-| `symlink`   | No secrets, and the runtime may write it                                                | tracked at `home/<path>` | symlink dest → source |
-| `copy`      | No secrets, and this repo owns the bytes; the runtime does not write it                 | tracked at `home/<path>` | copy dest from source |
+| Class       | When                                                                                    | This repo                | `just deploy`                   |
+| ----------- | --------------------------------------------------------------------------------------- | ------------------------ | ------------------------------- |
+| `live-only` | The file can hold tokens or other secrets, or it is a leftover name we refuse to create | absent; gitignored       | do not touch dest; never pruned |
+| `symlink`   | No secrets, and the runtime may write it                                                | tracked at `home/<path>` | symlink dest → source           |
+| `copy`      | No secrets, and this repo owns the bytes; the runtime does not write it                 | tracked at `home/<path>` | copy dest from source           |
 
 Sensitive wins. A mixed file that can hold API keys **and** policy **and** live UI state is `live-only`, like `auth.json`. Do not symlink it. Do not copy it. Do not keep an example that still looks like it could be the live file.
 
@@ -338,6 +349,8 @@ Caches (`web-search-cache/`, sessions, npm trees) are not sidecars. They stay li
 Machine contract: `docs/plugins/<plugin-name>/sidecars.json`. `just doctor` / `just check` prove it. `just deploy` lands `copy` and `symlink` rows from that file.
 
 `path` is relative to `$HOME`, which is what the package actually reads, and the source is tracked at `home/<path>`. A path under `.pi/agent/` lands at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/<rest>`. Any other path lands at `$HOME/<path>`. There is no `root` key. No `..`.
+
+Deploy also removes the dest file when a row leaves `sidecars.json`, or when its pin leaves `packages`. A `live-only` row is excluded from the manifest at landing time and filtered again at prune time, which is why `prove_sidecars_landing` can keep tolerating a live-only dest file that exists. The install tree behind a dropped pin is removed by `pi remove`, never by deleting a directory inside the shared npm project.
 
 Do not copy a `symlink` sidecar on every deploy. That clobbers live writes. `copy` plus `followsSymlinks: false` is the hardlink stand-in when the package cannot follow a link. Do not leave a non-secret sidecar unclassified or live-only “until we have a policy”: `{}` in this clone is a managed default.
 
@@ -443,7 +456,7 @@ A subdirectory inside `pi-config` (`packages/pi-foo`) is acceptable while incuba
 1. **One writer per file.** Nix owns the binary and `PI_SKIP_VERSION_CHECK`. This git tree owns authored config. `just deploy` copies static payloads and creates the live symlinks. Pi writes `settings.json` and `keybindings.json` through those links.
 2. **This repo is source, not the agent dir.** `home/` mirrors `$HOME` exactly, so a payload's repo path is its home path, and deploy is a copy or a symlink of that path. The root is machinery, and nothing there is ever deployed.
 3. **Secrets never enter git or the Nix store.**
-4. **Declare installs; ignore trees.** `packages` in source `settings.json` is tracked. Live `npm/`, `git/`, `bin/` are not.
+4. **Declare installs; converge trees.** `packages` in source `settings.json` is tracked. Live `npm/`, `git/`, `bin/` are not. A pin that leaves `packages` takes its install tree with it, through `pi remove`.
 5. **Sessions are state, not config.** They stay in the live agent dir, which is outside this git tree.
 6. **Edit here, then deploy copies.** `/settings` and `pi install` mutate the clone through the symlink; commit those. Static payloads still need `just deploy` after you edit them. `/login` is never committed.
 7. **Personal glue stays; a named feature leaves.**
@@ -481,6 +494,7 @@ If you previously used `programs.pi-coding-agent.settings` or `home.file` to mat
 5. Copy `home/.pi/agent/models.example.json` to live `models.json` if that file is untracked and this machine needs it.
 6. Materialize global packages. They are not installed on Pi startup (that auto-install is project `.pi/` only). `pi update --extensions` If a pin is still missing, `pi install` that source from `settings.json` `packages`.
 7. Do not copy `sessions/` or `auth.json` from another machine unless you intend to.
+8. On a host landed before the deploy manifest existed, the first deploy prints `unmanaged` notes. Read them, then run `just deploy-adopt` once.
 
 If Home Manager used to own files in the agent dir, activate the thinned module **before** `just deploy`. Deploy refuses when `AGENTS.md` or `prompts` is a store symlink.
 
@@ -496,7 +510,7 @@ If Home Manager used to own files in the agent dir, activate the thinned module 
 2. `just deploy`, then `/reload`.
 3. When it deserves its own version, copy to `pi-<feature>` following §10.
 4. Replace the local files with a `packages` pin in source `settings.json`.
-5. Delete the now-duplicate tree from `pi-config` and deploy.
+5. Delete the now-duplicate tree from `pi-config` and deploy. Deploy removes the copies it landed, and names each one. Preview with `just deploy-report` first if you want to read the list before it acts.
 
 ### Work inside this repo
 
@@ -567,6 +581,10 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Naming extracted packages `pi-plugins` or leaving them unnamed inside `extensions/` after they have users of their own
 - Installing a gate's tool into the home profile instead of adding it to `flake.nix`
 - Letting a formatter rewrite a sidecar Pi writes at runtime
+- Hand-deleting a package tree under `npm/node_modules/` instead of running `pi remove`, which leaves the dependency in Pi's `package.json` and resurrects the tree on the next install
+- Hand-writing a prune rule for one filename into `doctor` instead of letting the manifest own extent
+- Recomputing the deploy manifest by re-enumerating the payload instead of recording what deploy landed
+- Committing `.pi-config-manifest.json`, which is per-host state at the dest
 - Passing `--no-verify`
 
 ---
@@ -581,7 +599,7 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Auth lives at the live agent dir `auth.json` and is never linked.
 - This clone is SoT for every plugin config. Classify each sidecar from upstream docs. Sensitive or mixed-secret files are `live-only`. `web-search.json` is live-only because it can hold keys and curator state.
 - ~~Repo root uses Pi’s conventional layout so deploy is a copy or a symlink of those names.~~ Superseded below.
-- Sessions and package install trees stay in the live dir, off git.
+- ~~Sessions and package install trees stay in the live dir, off git.~~ Still true for git, but deploy no longer ignores an install tree: see the convergence entries below.
 - Shareable add-ons are packages named `pi-<feature>`, usually separate repositories.
 - The repository name is `pi-config`.
 - Global `packages` pins are SoT in source `settings.json`. `just check` / `just doctor` prove each pin has `docs/plugins/<name>/` (README, SPEC, sidecars.json) and that each sidecar class is landed. `just status` reports live trees and sidecar dest state. Missing trees are notes, not doctor failures. Names are derived from pins; recipes do not hardcode plugin ids.
@@ -590,5 +608,11 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Reversed: pointing `PI_CODING_AGENT_DIR` at the clone, and treating the clone as the directory Pi mutates.
 - `flake.nix` and `.envrc` supply the toolchain; `.pre-commit-config.yaml` holds the gates. The two never merge: no `git-hooks.nix`, no `flake-parts`, no `treefmt-nix`. A gate is readable without evaluating Nix, and the shell is buildable without running a gate.
 - dprint formats markdown and JSON, except the JSON Pi writes at runtime. The runtime owns the bytes of a file it writes.
+- `just deploy` converges. It lands what the repo declares and removes what the repo stopped declaring, so this repository is the state of the live agent dir rather than a floor under it.
+- The deploy manifest at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/.pi-config-manifest.json` records what deploy created. Prune considers only paths in it, so a file Pi wrote can never be a candidate.
+- The manifest is recorded as a side effect of landing, never recomputed. A parallel enumeration would have to repeat the `live-only` and optional-absent skips, and a divergence there deletes a secret-bearing sidecar.
+- Prune uses `os.remove` and `os.rmdir` only, never a recursive delete, so a directory holding both deploy's file and a package's runtime file survives by construction.
+- A file that predates the manifest is reported as unmanaged and removed only by `just deploy-adopt`.
+- Install-tree convergence runs `pi remove` last, and treats exit 1 with `No matching package found` as success once the dependency is verified gone.
 - Supersedes the repo-root-layout entry above: the payload lives under `home/`, a literal `$HOME` mirror, and the root is machinery only. A payload's repo path states its own destination, so deploy is still a copy or a symlink of that path. This also ends the `AGENTS.md` double injection structurally, because a cwd lookup at the clone root now finds the clone's own rules and never the payload. `AGENTS.override.md` is deleted.
 - A sidecar `path` in `docs/plugins/<name>/sidecars.json` is relative to `$HOME` and is tracked at `home/<path>`. The `root` key is gone: a path under `.pi/agent/` follows `PI_CODING_AGENT_DIR`, and anything else lands under `$HOME`.

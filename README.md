@@ -37,7 +37,9 @@ just deploy
 
 ## Commands
 
-- `just deploy` — copy static payloads and `copy` sidecars; symlink live-writable tracked files
+- `just deploy` — converge the live agent dir: copy static payloads and `copy` sidecars, symlink live-writable tracked files, and remove what this repo no longer declares
+- `just deploy-report` — the same, but print what would be removed and remove nothing
+- `just deploy-adopt` — the same, and also remove files a plain deploy only reports as unmanaged
 - `just doctor` — prove the source tree, plugin docs, sidecar classes, and the landing when dest exists
 - `just status` — show source, dest, live files, and each pin vs docs vs tree
 - `just check` — source-tree proofs (safe without a host landing)
