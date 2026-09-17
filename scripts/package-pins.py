@@ -16,6 +16,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -24,6 +25,11 @@ SIDECAR_CLASSES = {"live-only", "symlink", "copy"}
 # home/ mirrors $HOME, so a sidecar path states its own destination.
 HOME_MIRROR = "home"
 AGENT_PREFIX = ".pi/agent/"
+
+# Every sidecar path is $HOME-relative and must stay under this prefix, which
+# bounds deploy's landing roots to the agent dir and ~/.pi. Prune derives its
+# authority from those two, so widening this widens what deploy may delete.
+LANDING_ROOT = ".pi/"
 
 SIDECAR_KEYS = {
     "path",
@@ -231,6 +237,13 @@ def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object
                 f"{path} sidecars[{i}] path must be a relative path with no .."
             )
         rel = rel.replace("\\", "/")
+        if not rel.startswith(LANDING_ROOT):
+            raise SystemExit(
+                f"{path} sidecars[{i}] path must start with {LANDING_ROOT!r}. "
+                "Deploy removes what the repo stops declaring, and it holds that "
+                "authority only under the agent dir and ~/.pi. A package reading "
+                "elsewhere needs a deliberate widening of both, in SPEC.md §9."
+            )
         if klass not in SIDECAR_CLASSES:
             raise SystemExit(
                 f"{path} sidecars[{i}] class must be one of {sorted(SIDECAR_CLASSES)}"
@@ -759,25 +772,6 @@ def read_manifest(dest: str) -> list[dict[str, str]]:
     return out
 
 
-def read_manifest_roots(dest: str) -> list[str]:
-    """The physical roots the previous deploy was allowed to write under.
-
-    Prune validates against these rather than a hardcoded pair, so a sidecar
-    landing outside ~/.pi stays prunable without widening the authority to
-    all of $HOME. A manifest written before this field falls back to the two
-    roots that were hardcoded then.
-    """
-    path = manifest_path(dest)
-    try:
-        data = json.load(open(path, encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return []
-    roots = data.get("roots") if isinstance(data, dict) else None
-    if isinstance(roots, list) and roots:
-        return [str(r) for r in roots if isinstance(r, str)]
-    return [os.path.realpath(dest), os.path.realpath(os.path.expanduser("~/.pi"))]
-
-
 def entry_path(path: str) -> str:
     """The physical location of a directory entry, without resolving its leaf.
 
@@ -790,18 +784,27 @@ def entry_path(path: str) -> str:
     return os.path.join(parent, os.path.basename(path))
 
 
-def landing_roots(dest: str, landed: list[tuple[str, str]]) -> list[str]:
-    """Physical roots this deploy wrote under: the dest, plus the parent of
-    each landing outside it. A sidecar path is $HOME-relative, so without
-    this the manifest boundary and the sidecar contract disagree."""
-    dest_real = os.path.realpath(dest)
-    roots = {dest_real}
-    for path, _ in landed:
-        entry = entry_path(path)
-        if entry.startswith(dest_real + os.sep):
-            continue
-        roots.add(os.path.dirname(entry))
-    return sorted(roots)
+def landing_roots(dest: str) -> list[str]:
+    """The only two roots deploy may write under, as policy, not as data.
+
+    Derived here and never read back from the manifest. Roots stored beside
+    the paths they authorize would be circular: editing one field of an
+    untrusted document would licence deleting anything it named. LANDING_ROOT
+    below is what keeps a sidecar path inside these two.
+    """
+    return [os.path.abspath(dest), os.path.abspath(os.path.expanduser("~/.pi"))]
+
+
+def within_root(target: str, root: str) -> bool:
+    """True when target lies under root both lexically and physically.
+
+    Both must hold. The lexical test stops a swapped root directory from
+    redirecting deletions somewhere else; the physical test stops a swapped
+    intermediate directory from doing the same.
+    """
+    lexical = os.path.abspath(target).startswith(os.path.abspath(root) + os.sep)
+    physical = entry_path(target).startswith(os.path.realpath(root) + os.sep)
+    return lexical and physical
 
 
 def write_manifest(src: str, dest: str, landed: list[tuple[str, str]]) -> None:
@@ -809,7 +812,6 @@ def write_manifest(src: str, dest: str, landed: list[tuple[str, str]]) -> None:
         "version": MANIFEST_VERSION,
         "deployedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source": os.path.abspath(src),
-        "roots": landing_roots(dest, landed),
         "paths": [{"path": path, "how": how} for path, how in landed],
     }
     body = json.dumps(payload, indent=2) + "\n"
@@ -829,12 +831,17 @@ def write_manifest_bytes(path: str, data: bytes) -> None:
         raise SystemExit(f"refusing to write the manifest through a symlink: {path}")
     parent = os.path.dirname(path) or "."
     os.makedirs(parent, exist_ok=True)
-    tmp = os.path.join(parent, f".{os.path.basename(path)}.tmp")
-    with open(tmp, "wb") as handle:
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
+    fd, tmp = tempfile.mkstemp(dir=parent, prefix=".pi-config-manifest.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.lexists(tmp):
+            os.remove(tmp)
+        raise
 
 
 def prove_manifest(src: str, dest: str) -> None:
@@ -853,11 +860,10 @@ def prove_manifest(src: str, dest: str) -> None:
         raise SystemExit(f"{path} carries no usable paths")
 
     dest_abs = os.path.abspath(dest)
-    roots = [os.path.realpath(root) for root in read_manifest_roots(dest)]
+    roots = landing_roots(dest)
     for row in rows:
         target, how = row["path"], row["how"]
-        real = entry_path(target)
-        if not any(real.startswith(root + os.sep) for root in roots):
+        if not any(within_root(target, root) for root in roots):
             raise SystemExit(f"manifest path escapes the landing roots: {target}")
         if how == "dir":
             if not os.path.isdir(target):
@@ -995,16 +1001,7 @@ def classify_stale(
     if os.path.realpath(target) in protected or real in protected:
         return "keep"
     src_abs = os.path.realpath(src)
-    # Containment is judged on the physical entry, not the spelling. os.remove
-    # follows a symlinked parent, so a lexical check would let a swapped
-    # intermediate directory carry a deletion outside the landing roots.
-    real_roots = [os.path.realpath(root) for root in roots]
-    inside = any(real.startswith(root + os.sep) for root in real_roots)
-    if (
-        not inside
-        or real in real_roots
-        or real == os.path.realpath(os.path.expanduser("~"))
-    ):
+    if not any(within_root(target, root) for root in roots):
         raise SystemExit(f"refusing to prune outside the landing roots: {target}")
     if real == src_abs or real.startswith(src_abs + os.sep):
         raise SystemExit(f"refusing to prune inside the clone: {target}")
@@ -1024,7 +1021,7 @@ def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
     mode = prune_mode()
     landed = read_run_manifest()
     old = read_manifest(dest)
-    old_roots = read_manifest_roots(dest)
+    roots = landing_roots(dest)
     keep = {os.path.realpath(path) for path, _ in landed}
     protected = live_only_dests(dest, sidecars)
 
@@ -1033,7 +1030,7 @@ def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
         (
             row["path"],
             row["how"],
-            classify_stale(src, old_roots, row["path"], row["how"], protected),
+            classify_stale(src, roots, row["path"], row["how"], protected),
         )
         for row in stale
     ]
@@ -1080,9 +1077,7 @@ def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
     unmanaged = unmanaged_paths(dest, landed, protected)
     for target in unmanaged:
         if mode == "adopt":
-            verdict = classify_stale(
-                src, landing_roots(dest, landed), target, "copy", protected
-            )
+            verdict = classify_stale(src, roots, target, "copy", protected)
             if verdict != "prune":
                 print(f"  {verdict:<7} unmanaged {target}")
                 continue

@@ -350,6 +350,8 @@ Machine contract: `docs/plugins/<plugin-name>/sidecars.json`. `just doctor` / `j
 
 `path` is relative to `$HOME`, which is what the package actually reads, and the source is tracked at `home/<path>`. A path under `.pi/agent/` lands at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/<rest>`. Any other path lands at `$HOME/<path>`. There is no `root` key. No `..`.
 
+**A `path` must start with `.pi/`.** That bound is deliberate and enforced. Deploy removes what the repo stops declaring, and it holds that authority only under the live agent dir and `~/.pi`. Those two roots are policy, derived in code, never read back from the manifest: roots stored beside the paths they authorize would let one edit of an untrusted file licence deleting anything it named. A package that reads outside `~/.pi` therefore needs a deliberate widening of this rule and of the landing roots together, in one commit that says why. Do not reject the package for it, and do not widen the rule quietly.
+
 Deploy also removes the dest file when a row leaves `sidecars.json`, or when its pin leaves `packages`. A `live-only` row is excluded from the manifest at landing time and filtered again at prune time, which is why `prove_sidecars_landing` can keep tolerating a live-only dest file that exists. The install tree behind a dropped pin is removed by `pi remove`, never by deleting a directory inside the shared npm project.
 
 Do not copy a `symlink` sidecar on every deploy. That clobbers live writes. `copy` plus `followsSymlinks: false` is the hardlink stand-in when the package cannot follow a link. Do not leave a non-secret sidecar unclassified or live-only “until we have a policy”: `{}` in this clone is a managed default.
