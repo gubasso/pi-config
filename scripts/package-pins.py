@@ -327,6 +327,41 @@ def store_owned(path: str) -> bool:
     return "/nix/store/" in target.replace("\\", "/")
 
 
+def record(how: str, path: str) -> None:
+    """Append one landing to the run manifest deploy assembles.
+
+    The manifest is recorded, never recomputed. A parallel enumeration would
+    have to re-implement the live-only and optional-absent skips above, and
+    every divergence there becomes a deletion of a file deploy never landed.
+
+    A no-op when PI_CONFIG_RUN_MANIFEST is unset, so status and doctor are
+    unaffected.
+    """
+    run_manifest = os.environ.get("PI_CONFIG_RUN_MANIFEST")
+    if not run_manifest:
+        return
+    with open(run_manifest, "a", encoding="utf-8") as handle:
+        handle.write(f"{how}\t{os.path.abspath(path)}\n")
+
+
+def record_new_dirs(dest: str, dest_path: str) -> None:
+    """Record each directory strictly under dest that landing dest_path creates.
+
+    Only components under dest are recorded. $HOME/.pi is never one, so an
+    undeclared lsp-client.json removes the file and leaves ~/.pi alone.
+    """
+    if not os.environ.get("PI_CONFIG_RUN_MANIFEST"):
+        return
+    dest_abs = os.path.abspath(dest)
+    parent = os.path.dirname(os.path.abspath(dest_path))
+    missing = []
+    while parent.startswith(dest_abs + os.sep) and not os.path.isdir(parent):
+        missing.append(parent)
+        parent = os.path.dirname(parent)
+    for path in reversed(missing):
+        record("dir", path)
+
+
 def prove_json_sidecar(path: str, rel: str) -> None:
     if not rel.endswith(".json"):
         return
@@ -590,6 +625,7 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
             continue
         if store_owned(dest_path):
             raise SystemExit(f"Home Manager still owns {dest_path} (store symlink).")
+        record_new_dirs(dest, dest_path)
         os.makedirs(os.path.dirname(dest_path) or dest, exist_ok=True)
         if klass == "symlink":
             if os.path.isdir(dest_path) and not os.path.islink(dest_path):
@@ -599,16 +635,19 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
             if os.path.lexists(dest_path):
                 os.remove(dest_path)
             os.symlink(os.path.abspath(source_path), dest_path)
+            record("symlink", dest_path)
             print(f"linked {dest_path} -> {source_path}")
             continue
         if row.get("followsSymlinks") is False:
             land_atomic_sot(src, sidecar_repo_path(rel), rel, source_path, dest_path)
+            record("copy", dest_path)
             continue
         if os.path.isdir(dest_path) and not os.path.islink(dest_path):
             raise SystemExit(f"refusing to replace directory {dest_path} with a copy")
         if os.path.lexists(dest_path):
             os.remove(dest_path)
         copy_regular(source_path, dest_path)
+        record("copy", dest_path)
         print(f"copied {dest_path}")
 
 

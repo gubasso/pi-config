@@ -60,6 +60,20 @@ deploy:
     }
 
     mkdir -p "$dest"
+    dest="$(cd "$dest" && pwd -P)"
+
+    # Every landing appends one `how<TAB>abs-path` line here, right where it
+    # already echoes. A later step turns this into the deploy manifest. The
+    # manifest is recorded, never recomputed: a parallel enumeration would have
+    # to re-implement the skip rules inside land_sidecars, and each divergence
+    # there is a deletion.
+    run_manifest="$(mktemp -t pi-config-run.XXXXXX)"
+    export PI_CONFIG_RUN_MANIFEST="$run_manifest"
+    trap 'rm -f "$run_manifest"' EXIT
+
+    record() {
+      printf '%s\t%s\n' "$1" "$2" >>"$PI_CONFIG_RUN_MANIFEST"
+    }
 
     if store_owned "$dest/AGENTS.md" || store_owned "$dest/prompts"; then
       echo "Home Manager still owns $dest (store symlink)." >&2
@@ -73,6 +87,7 @@ deploy:
 
     copy_file() {
       install -m 0644 "$1" "$2"
+      record copy "$2"
       echo "copied $2"
     }
 
@@ -82,10 +97,12 @@ deploy:
         rm -f "$to"
       fi
       mkdir -p "$to"
+      record dir "$to"
       local f
       for f in "$from"/*; do
         [ -f "$f" ] || continue
         install -m 0644 "$f" "$to/$(basename "$f")"
+        record copy "$to/$(basename "$f")"
         echo "copied $to/$(basename "$f")"
       done
     }
@@ -104,6 +121,7 @@ deploy:
         rm -f "$to"
       fi
       ln -sfn "$from" "$to"
+      record symlink "$to"
       echo "linked $to -> $from"
     }
 
