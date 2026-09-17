@@ -294,7 +294,13 @@ Do not install two packages that register the same tool names for the same job.
 
 ### Pin form
 
-The `packages` entry is the unversioned source: `npm:<name>` or `git:github.com/<user>/<repo>`. Do not add `@version` or a git SHA unless the operator explicitly asks to freeze that pin. Floating pins move with `pi update --extensions`. A freeze is a later decision on that pin, not the default. Existing frozen pins stay until that pin is revisited.
+The `packages` entry is the unversioned source: `npm:<name>` or `git:github.com/<user>/<repo>`. Do not add `@version`, `@tag`, or a git SHA. Unversioned pins move with `pi update --extensions`, and with nothing else. Reasoning and the update ritual: [docs/guides/package-pinning.md](./docs/guides/package-pinning.md).
+
+Pi treats any git ref as frozen, a branch name included, and treats only an exact npm version as frozen. A frozen source never appears in the startup update notice, so a freeze also costs the operator that signal.
+
+Freeze one pin only to hold back a known-bad upstream. Write the reason and the removal condition in the commit message. A freeze with no written expiry is the failure this rule exists to stop.
+
+Which upstream commit the operator actually read is a separate fact from which source to install. It lives in `docs/plugins/<plugin-name>/SPEC.md` as a `Verified against upstream <sha>` line, and it is bumped in a commit after the operator reads the upstream diff. Never put that SHA back into the pin.
 
 ### Sidecar config files
 
@@ -405,11 +411,11 @@ Ship:
 # npm
 npm publish
 
-# git, pin a tag
-pi install git:github.com/<you>/pi-<feature>@v0.1.0
+# git, from a repo that tags its releases
+pi install git:github.com/<you>/pi-<feature>
 ```
 
-After extract, this source repo consumes it as a pin in `settings.json`. The live file is a symlink, so `pi install` writes the pin here; then `just deploy` is only needed for copied payloads. Do not commit the clone under `git/` or `npm/` here or in the live agent dir.
+Tag the release upstream. Consume it here unversioned, like every other pin. After extract, this source repo consumes it as a pin in `settings.json`. The live file is a symlink, so `pi install` writes the pin here; then `just deploy` is only needed for copied payloads. Do not commit the clone under `git/` or `npm/` here or in the live agent dir.
 
 A subdirectory inside `pi-config` (`packages/pi-foo`) is acceptable while incubating. Do not publish this repository, and do not publish the live agent directory, as “the plugin.”
 
@@ -530,7 +536,9 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Committing `auth.json` because “it is config”
 - Vendoring live `npm/` or `git/` into this git tree
 - Choosing or rejecting a package because it would require a deploy, sidecar, or layout refactor
-- Adding `@version` or a git SHA to a `packages` pin unless the operator explicitly asked to freeze that pin
+- Adding `@version`, `@tag`, or a git SHA to a `packages` pin, outside a freeze that holds back a known-bad upstream
+- Freezing a pin without writing its reason and its removal condition in the commit message
+- Recording the audited upstream commit in the pin instead of in `docs/plugins/<name>/SPEC.md`
 - Leaving a plugin pin without `docs/plugins/<name>/sidecars.json`
 - Treating the live agent dir as SoT for a non-secret plugin sidecar
 - Symlinking a sidecar that can hold tokens
@@ -560,6 +568,7 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - The repository name is `pi-config`.
 - Global `packages` pins are SoT in source `settings.json`. `just check` / `just doctor` prove each pin has `docs/plugins/<name>/` (README, SPEC, sidecars.json) and that each sidecar class is landed. `just status` reports live trees and sidecar dest state. Missing trees are notes, not doctor failures. Names are derived from pins; recipes do not hardcode plugin ids.
 - Package selection is effectiveness-first (precision, determinism, token-sane tools). Fit to the current pi-config layout is not a criterion and must not become one. Popularity, maturity, and compatibility are clues. Setup, refactor, and greenfield cost are not vetoes.
+- Pins are unversioned. The audited upstream commit lives in `docs/plugins/<name>/SPEC.md`, not in the pin. A freeze holds back a known-bad upstream and carries a written removal condition. Reasoning: [docs/guides/package-pinning.md](./docs/guides/package-pinning.md).
 - Reversed: pointing `PI_CODING_AGENT_DIR` at the clone, and treating the clone as the directory Pi mutates.
 - `flake.nix` and `.envrc` supply the toolchain; `.pre-commit-config.yaml` holds the gates. The two never merge: no `git-hooks.nix`, no `flake-parts`, no `treefmt-nix`. A gate is readable without evaluating Nix, and the shell is buildable without running a gate.
 - dprint formats markdown and JSON, except the JSON Pi writes at runtime. The runtime owns the bytes of a file it writes.

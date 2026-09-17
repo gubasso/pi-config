@@ -2,7 +2,7 @@
 
 One directory per third-party Pi package this operator installs. Humans and coding agents read it before changing the pin, a sidecar file, or deploy.
 
-Repo contract: [SPEC.md](../../SPEC.md). Selection: [guides/package-selection.md](../guides/package-selection.md). Install steps: [guides/install-packages.md](../guides/install-packages.md). LSP: [guides/lsp.md](../guides/lsp.md).
+Repo contract: [SPEC.md](../../SPEC.md). Selection: [guides/package-selection.md](../guides/package-selection.md). Pin form: [guides/package-pinning.md](../guides/package-pinning.md). Install steps: [guides/install-packages.md](../guides/install-packages.md). LSP: [guides/lsp.md](../guides/lsp.md).
 
 These directories record **how** a chosen pin is landed. They do not decide which package wins. Fit to an existing sidecar class is not a selection criterion.
 
@@ -32,6 +32,18 @@ Keep it flat. Three required documents, optional extras as sibling `.md` files, 
 | `<topic>.md`    | no       | Extra research that is not the landing contract     |
 
 `README.md` does not repeat the SPEC. `SPEC.md` does not narrate install (that is the guide). Do not put secrets or `npm/` trees here. These paths are not deployed.
+
+## The audited version
+
+Pins are unversioned, so the plugin `SPEC.md` is where this repo records which upstream code the operator actually read. Open every `SPEC.md` with that line:
+
+```markdown
+Verified against upstream `<40-char-sha>` (`file-a.ts`, `file-b.ts`, README).
+```
+
+Use the published version instead of a SHA when the package comes from npm, as `pi-better-edit` does. Name the files that were read, not only the commit.
+
+Bump that line in a commit after `pi update --extensions` moves the tree and the operator reads the upstream diff. That commit is what replaces the old habit of bumping a SHA inside the pin. Steps: [guides/package-pinning.md](../guides/package-pinning.md).
 
 `sidecars.json` lists every config file the package reads that this clone must classify, including leftover names we refuse to create. Schema:
 

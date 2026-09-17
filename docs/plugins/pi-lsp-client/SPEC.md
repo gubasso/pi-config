@@ -4,10 +4,10 @@ Verified against upstream `1c981dfcacc456fe4ce9f4120a2f0250b54d6844` (`src/lsp/c
 
 ## Pin and tree
 
-| Artifact     | This repo                                                                                                         | Live                                        |
-| ------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| Pin          | `settings.json` `packages` → `git:github.com/code-yeongyu/pi-lsp-client@1c981dfcacc456fe4ce9f4120a2f0250b54d6844` | symlink already                             |
-| Install tree | no                                                                                                                | `git/github.com/code-yeongyu/pi-lsp-client` |
+| Artifact     | This repo                                                                              | Live                                        |
+| ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Pin          | `settings.json` `packages` → `git:github.com/code-yeongyu/pi-lsp-client` (unversioned) | symlink already                             |
+| Install tree | no                                                                                     | `git/github.com/code-yeongyu/pi-lsp-client` |
 
 ## Sidecars
 

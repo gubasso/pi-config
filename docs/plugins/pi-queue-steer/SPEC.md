@@ -4,10 +4,10 @@ Verified against upstream `1f67c4c83e364538f347fdc8c2005c38eaaf8536` (tag `v0.2.
 
 ## Pin and tree
 
-| Artifact     | This repo                                                                                                      | Live                                     |
-| ------------ | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Pin          | `settings.json` `packages` → `git:github.com/tmustier/pi-queue-steer@1f67c4c83e364538f347fdc8c2005c38eaaf8536` | symlink already                          |
-| Install tree | no                                                                                                             | `git/github.com/tmustier/pi-queue-steer` |
+| Artifact     | This repo                                                                           | Live                                     |
+| ------------ | ----------------------------------------------------------------------------------- | ---------------------------------------- |
+| Pin          | `settings.json` `packages` → `git:github.com/tmustier/pi-queue-steer` (unversioned) | symlink already                          |
+| Install tree | no                                                                                  | `git/github.com/tmustier/pi-queue-steer` |
 
 `package.json` declares one entry point, `index.ts`, under the `pi.extensions` key. The package ships no skill, prompt, or theme.
 

@@ -14,10 +14,10 @@
     "npm:@narumitw/pi-plan-mode",
     "npm:pi-intercom",
     "npm:@99percentpeople/pi-todo",
-    "git:github.com/code-yeongyu/pi-lsp-client@1c981dfcacc456fe4ce9f4120a2f0250b54d6844",
-    "git:github.com/code-yeongyu/pi-ast-grep@4a7d1beee684d96a6890e5fc55710bb63fecca85",
+    "git:github.com/code-yeongyu/pi-lsp-client",
+    "git:github.com/code-yeongyu/pi-ast-grep",
     "npm:@georgedong32/pi-review",
-    "git:github.com/tmustier/pi-queue-steer@1f67c4c83e364538f347fdc8c2005c38eaaf8536",
+    "git:github.com/tmustier/pi-queue-steer",
     "npm:pi-worktrunk",
     "npm:pi-better-edit"
   ]

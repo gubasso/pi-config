@@ -31,7 +31,7 @@ Verified against the upstream README and source (2026-09-16):
 
 Gaps to live with, not reasons to rank it down:
 
-- Not on npm (`@code-yeongyu/pi-lsp-client` 404). No git tags. Pin a git commit until there is a release.
+- Not on npm (`@code-yeongyu/pi-lsp-client` 404, and the unscoped name is absent too). No git tags and no releases, so the pin follows the default branch. Read the diff before you trust an update: [package-pinning.md](./package-pinning.md).
 - User config is `~/.pi/lsp-client.json` (and project `.pi/lsp-client.json`), not under the live agent dir. Extend deploy. Do not reject the pin.
 - `/lsp install` can download servers. Do not use it. Put language servers on PATH. Never treat auto-install as required.
 - No hover tool. Hover is nice; definition/references/diagnostics/rename are the job.
@@ -42,6 +42,8 @@ Gaps to live with, not reasons to rank it down:
 It is the most capable single package. Completions are dead weight in an LLM prompt. `code_search` / `code_rewrite` / `code_overview` are a second job. Tree-sitter fallback can look like type intelligence when no server is running. Brazil/lombok/`/bemol` do not help this operator. Last push 2026-06-10.
 
 If structural search is wanted, pin [code-yeongyu/pi-ast-grep](https://github.com/code-yeongyu/pi-ast-grep) as its own package (`ast_grep_search`, `ast_grep_replace` dry-run default). That is the composition senpi already uses. Do not take samfoy just to get AST bundled with LSP.
+
+`npm:pi-ast-grep` is a different package by a different author, published once as 0.1.0 with no repository field. Pin the git source. Never shorten it to the npm name.
 
 ### Why not narumitw for this job
 
@@ -55,7 +57,7 @@ Same vendor as `pi-plan-mode`, 0.49.7, ~10k downloads/month, PATH-only, two tool
 
 ## Setup in this clone
 
-Landed. Pins, plugin docs, and `lsp-client.json` are in this clone. Trees are live `git/` after `pi update --extensions`. Do not skip classify on a version bump.
+Landed. Pins, plugin docs, and `lsp-client.json` are in this clone. Trees are live `git/` after `pi update --extensions`. Do not skip classify on a version bump. The audited commit lives in `docs/plugins/pi-lsp-client/SPEC.md`, not in the pin.
 
 1. One-shot, no pin:
 
@@ -67,13 +69,13 @@ Landed. Pins, plugin docs, and `lsp-client.json` are in this clone. Trees are li
 
 2. Read the loaded source. List every config path it reads (`~/.pi/lsp-client.json`, `.pi/lsp-client.json`, anything under the live agent dir). Classify each. If a path is outside the live agent dir, extend `just deploy` / `sidecars.json` so this clone stays SoT. Do not vendor the repo into `extensions/`.
 
-3. Pin a **commit**, not floating `main`, until upstream tags:
+3. Pin the unversioned source:
 
    ```bash
-   pi install git:github.com/code-yeongyu/pi-lsp-client@<commit>
+   pi install git:github.com/code-yeongyu/pi-lsp-client
    ```
 
-   That writes `settings.json` in this clone.
+   That writes `settings.json` in this clone. Record the commit you read in step 2 as the `Verified against upstream` line of the plugin SPEC.
 
 4. Author `docs/plugins/pi-lsp-client/{README.md,SPEC.md,sidecars.json}` and the source sidecar. A managed default that disables nothing required is fine. Do not enable `/lsp install` recipes as the way servers appear.
 
@@ -83,7 +85,7 @@ Landed. Pins, plugin docs, and `lsp-client.json` are in this clone. Trees are li
 
 7. Do **not** also pin `@narumitw/pi-lsp`, `pi-lsp-extension`, `pi-lsp-adapter`, or `@gitawego/pi-lsp`.
 
-Optional second pin, later, only if structural search is the next job: `git:github.com/code-yeongyu/pi-ast-grep@<commit>` with `PI_OFFLINE=1` if auto-download of `sg` is unwanted.
+Optional second pin, later, only if structural search is the next job: `git:github.com/code-yeongyu/pi-ast-grep` with `PI_OFFLINE=1` if auto-download of `sg` is unwanted.
 
 ## Recheck
 

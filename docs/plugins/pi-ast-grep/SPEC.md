@@ -4,10 +4,10 @@ Verified against upstream `4a7d1beee684d96a6890e5fc55710bb63fecca85` (`src/index
 
 ## Pin and tree
 
-| Artifact     | This repo                                                                                                       | Live                                      |
-| ------------ | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Pin          | `settings.json` `packages` → `git:github.com/code-yeongyu/pi-ast-grep@4a7d1beee684d96a6890e5fc55710bb63fecca85` | symlink already                           |
-| Install tree | no                                                                                                              | `git/github.com/code-yeongyu/pi-ast-grep` |
+| Artifact     | This repo                                                                            | Live                                      |
+| ------------ | ------------------------------------------------------------------------------------ | ----------------------------------------- |
+| Pin          | `settings.json` `packages` → `git:github.com/code-yeongyu/pi-ast-grep` (unversioned) | symlink already                           |
+| Install tree | no                                                                                   | `git/github.com/code-yeongyu/pi-ast-grep` |
 
 ## Sidecars
 

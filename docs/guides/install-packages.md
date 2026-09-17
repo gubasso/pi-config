@@ -6,7 +6,7 @@ Pi has no separate plugin type. A package is an npm or git unit that ships exten
 
 ## Choose first
 
-Selection policy: [package-selection.md](./package-selection.md). Contract: [SPEC.md](../../SPEC.md) §9.
+Selection policy: [package-selection.md](./package-selection.md). Pin form: [package-pinning.md](./package-pinning.md). Contract: [SPEC.md](../../SPEC.md) §9.
 
 Pick the package that makes the model more precise, deterministic, and effective at the job, with token-sane tool results. Popularity, maturity, and compatibility with the other pins are clues. Do not pick a package because it matches the current deploy layout, and do not reject one because landing it would require a refactor. Layout is downstream of the pin.
 
@@ -67,7 +67,9 @@ pi install npm:@scope/pkg
 pi install git:github.com/user/repo
 ```
 
-Leave the source unversioned. Freeze only when the operator asks: `npm:@scope/pkg@1.2.3`, `git:github.com/user/repo@<sha-or-tag>`. Contract: [package-selection.md](./package-selection.md) and [SPEC.md](../../SPEC.md) §9.
+Leave the source unversioned. Freeze one pin only to hold back a known-bad upstream, and write the reason and the removal condition in the commit message: `npm:@scope/pkg@1.2.3`, `git:github.com/user/repo@<sha-or-tag>`. Contract: [package-pinning.md](./package-pinning.md) and [SPEC.md](../../SPEC.md) §9.
+
+Record the upstream commit you read as the `Verified against upstream` line of the plugin `SPEC.md`. That line is the audit trail. The pin is not.
 
 Pi then:
 
@@ -116,6 +118,25 @@ pi install npm:<name>
 Do not run bare `pi update`. That also tries to update the Pi binary. Nix owns the binary (`PI_SKIP_VERSION_CHECK`).
 
 Create live-only secret files on that host if needed. Do not copy them from another machine unless you intend to.
+
+## Update
+
+Pins are unversioned, so every package moves when you run this and at no other time. Pi notices available updates at startup and installs none of them.
+
+```bash
+pi update --extensions                      # every package
+pi update --extension npm:<name>            # one package
+```
+
+Then read what moved before you trust it. Full ritual: [package-pinning.md](./package-pinning.md).
+
+```bash
+git -C "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/git/<host>/<user>/<repo>" log --oneline <old-sha>..HEAD
+```
+
+`<old-sha>` is the `Verified against upstream` line of the plugin `SPEC.md`. Re-classify sidecars when the diff touches a config path, then commit the new SHA into that line.
+
+An update resets a git tree hard and runs `git clean -fdx` inside it. Edits made in the install tree do not survive.
 
 ## Remove
 

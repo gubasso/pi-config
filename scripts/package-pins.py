@@ -89,6 +89,30 @@ def plugin_name(
     return slug or "package"
 
 
+def frozen_ref(source: str, kind: str) -> str | None:
+    """Return the version or ref this pin carries, or None when it has none.
+
+    SPEC.md §9 makes the unversioned form the default, so any suffix here
+    is a departure worth reporting. Pi itself freezes a git source on any
+    ref and an npm source on an exact version, and it leaves a frozen
+    source out of its startup update notice. An npm range is a departure
+    from the rule without being a freeze in Pi's sense.
+    """
+    if kind == "npm":
+        spec = source[4:].strip() if source.startswith("npm:") else source.strip()
+        match = re.match(r"^(@?[^@]+(?:/[^@]+)?)@(.+)$", spec)
+        return match.group(2) if match else None
+    if kind == "git":
+        text = source.strip()
+        if text.startswith("git:"):
+            text = text[4:].strip()
+        text = re.sub(r"^(https?|ssh|git)://", "", text, flags=re.I)
+        text = re.sub(r"^git@[^:]+:", "", text)
+        head, sep, ref = text.partition("@")
+        return ref.strip() if sep and ref.strip() and "/" in head else None
+    return None
+
+
 def classify(source: str, src: str, dest: str) -> tuple[str, str, str]:
     if source.startswith("npm:"):
         name = npm_name(source[4:])
@@ -124,7 +148,15 @@ def load_pins(src: str, dest: str) -> list[dict[str, str]]:
                 f"duplicate plugin docs name {name} ({seen_names[name]} and {pin})"
             )
         seen_names[name] = pin
-        pins.append({"pin": pin, "name": name, "kind": kind, "tree": tree})
+        pins.append(
+            {
+                "pin": pin,
+                "name": name,
+                "kind": kind,
+                "tree": tree,
+                "frozen": frozen_ref(pin, kind) or "",
+            }
+        )
     return pins
 
 
@@ -430,6 +462,22 @@ def prove_docs(src: str, pins: list[dict[str, str]]) -> None:
             if entry not in names:
                 raise SystemExit(f"docs/plugins/{entry} has no matching packages pin")
     print("ok  plugin docs pairing")
+    note_frozen(pins)
+
+
+def note_frozen(pins: list[dict[str, str]]) -> None:
+    """Report pins that carry a version or ref. A freeze is allowed, with a reason."""
+    frozen = [row for row in pins if row["frozen"]]
+    for row in frozen:
+        print(
+            f"note: pin {row['pin']} carries {row['frozen']}, and the default"
+            " is unversioned. Keep it only to hold back a known-bad upstream,"
+            " and say in the commit message what removes it"
+            " (docs/guides/package-pinning.md)",
+            file=sys.stderr,
+        )
+    if not frozen:
+        print("ok  pins unversioned")
 
 
 def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
@@ -565,7 +613,8 @@ def print_status(
             else "no"
         )
         tree_state = "yes" if row["tree"] and os.path.isdir(row["tree"]) else "no"
-        print(f"package {row['pin']} docs {docs_state} tree {tree_state}")
+        pin_state = f"frozen {row['frozen']}" if row["frozen"] else "unversioned"
+        print(f"package {row['pin']} docs {docs_state} tree {tree_state} {pin_state}")
     for row in sidecars:
         rel = str(row["path"])
         dest_path = sidecar_dest_path(dest, row) if dest else ""
