@@ -9,7 +9,16 @@ Nix installs the `pi` binary. This project does not set `PI_CODING_AGENT_DIR`. `
 
 `/login` writes live `auth.json` (mode `0600`). Secret plugin sidecars stay live-only. Those files are never symlinked and never enter git.
 
-Layout, tracking, secrets, and extract rules: [SPEC.md](./SPEC.md). Choose a package: [docs/guides/package-selection.md](./docs/guides/package-selection.md). Install a third-party package: [docs/guides/install-packages.md](./docs/guides/install-packages.md). LSP pin: [docs/guides/lsp.md](./docs/guides/lsp.md). Per-package notes: [docs/plugins/](./docs/plugins/README.md).
+## Documentation
+
+| Document                                                          | What it answers                          |
+| ----------------------------------------------------------------- | ---------------------------------------- |
+| [SPEC.md](./SPEC.md)                                              | Layout, tracking, secrets, extract rules |
+| [guides/harness-selection.md](./docs/guides/harness-selection.md) | Which agent binary this operator runs    |
+| [guides/package-selection.md](./docs/guides/package-selection.md) | Which package wins for a job             |
+| [guides/install-packages.md](./docs/guides/install-packages.md)   | How to land a third-party package        |
+| [guides/lsp.md](./docs/guides/lsp.md)                             | The LSP pin                              |
+| [plugins/](./docs/plugins/README.md)                              | Per-package landing notes                |
 
 ## Getting started
 
