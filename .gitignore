@@ -26,6 +26,7 @@
 /.pi/pi-review/
 
 # Repo-wide
+__pycache__/
 .env
 .env.*
 !.env.example

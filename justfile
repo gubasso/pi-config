@@ -146,6 +146,10 @@ deploy:
 
     just doctor
 
+    # Last, because pi remove runs npm and can need the network. A failure
+    # here leaves the config correct and only an install tree orphaned.
+    python3 "$src/scripts/package-pins.py" converge-trees "$src" "$dest"
+
 # Land, then show what deploy would remove, without removing it
 deploy-report:
     PI_CONFIG_PRUNE=report just deploy
