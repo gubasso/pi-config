@@ -1,7 +1,7 @@
 {
   "sidecars": [
     {
-      "path": "web-search.json",
+      "path": ".pi/agent/web-search.json",
       "class": "live-only",
       "sensitive": true,
       "runtimeWrites": true

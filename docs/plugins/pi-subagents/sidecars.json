@@ -1,13 +1,13 @@
 {
   "sidecars": [
     {
-      "path": "extensions/subagent/config.json",
+      "path": ".pi/agent/extensions/subagent/config.json",
       "class": "symlink",
       "sensitive": false,
       "runtimeWrites": true
     },
     {
-      "path": "subagent-tool-description.md",
+      "path": ".pi/agent/subagent-tool-description.md",
       "class": "copy",
       "sensitive": false,
       "runtimeWrites": false,

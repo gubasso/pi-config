@@ -2,10 +2,12 @@
 
 Source tree for one operator's global [Pi Coding Agent](https://pi.dev) config. It is not the live agent directory. Live files are `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`.
 
-Nix installs the `pi` binary. This project does not set `PI_CODING_AGENT_DIR`. `just deploy` lands owned files there in two ways:
+The payload lives under `home/`, which mirrors `$HOME`. A payload's repo path therefore states its own destination: `home/.pi/agent/settings.json` lands at the live agent dir, and `home/.pi/lsp-client.json` lands at `$HOME/.pi/lsp-client.json`. The repo root holds machinery only, and nothing outside `home/` is deployed.
 
-- **Copy** — static payloads Pi only reads (`AGENTS.md`, `prompts/`, …) and plugin sidecars classified `copy`.
-- **Symlink** — files the runtime mutates that this repo still tracks (`settings.json`, `keybindings.json`, plugin sidecars classified `symlink`). `/settings`, `pi install`, and plugin Settings writes go through into git.
+Nix installs the `pi` binary. This project does not set `PI_CODING_AGENT_DIR`. `just deploy` lands owned files in two ways:
+
+- **Copy** — static payloads Pi only reads (`home/.pi/agent/AGENTS.md`, `home/.pi/agent/prompts/`, …) and plugin sidecars classified `copy`.
+- **Symlink** — files the runtime mutates that this repo still tracks (`home/.pi/agent/settings.json`, `keybindings.json`, plugin sidecars classified `symlink`). `/settings`, `pi install`, and plugin Settings writes go through into git.
 
 `/login` writes live `auth.json` (mode `0600`). Secret plugin sidecars stay live-only. Those files are never symlinked and never enter git.
 

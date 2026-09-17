@@ -32,7 +32,7 @@ Verified against the upstream README and source (2026-09-16):
 Gaps to live with, not reasons to rank it down:
 
 - Not on npm (`@code-yeongyu/pi-lsp-client` 404, and the unscoped name is absent too). No git tags and no releases, so the pin follows the default branch. Read the diff before you trust an update: [package-pinning.md](./package-pinning.md).
-- User config is `~/.pi/lsp-client.json` (and project `.pi/lsp-client.json`), not under the live agent dir. Extend deploy. Do not reject the pin.
+- User config is `~/.pi/lsp-client.json` (and project `.pi/lsp-client.json`), not under the live agent dir. The `home/` mirror holds it at `home/.pi/lsp-client.json`. Do not reject the pin.
 - `/lsp install` can download servers. Do not use it. Put language servers on PATH. Never treat auto-install as required.
 - No hover tool. Hover is nice; definition/references/diagnostics/rename are the job.
 - Post-edit text is not hard-capped at 10 lines (samfoy is). The diagnostics tool still truncates at 200.
@@ -57,7 +57,7 @@ Same vendor as `pi-plan-mode`, 0.49.7, ~10k downloads/month, PATH-only, two tool
 
 ## Setup in this clone
 
-Landed. Pins, plugin docs, and `lsp-client.json` are in this clone. Trees are live `git/` after `pi update --extensions`. Do not skip classify on a version bump. The audited commit lives in `docs/plugins/pi-lsp-client/SPEC.md`, not in the pin.
+Landed. Pins, plugin docs, and `home/.pi/lsp-client.json` are in this clone. Trees are live `git/` after `pi update --extensions`. Do not skip classify on a version bump. The audited commit lives in `docs/plugins/pi-lsp-client/SPEC.md`, not in the pin.
 
 1. One-shot, no pin:
 
@@ -67,7 +67,7 @@ Landed. Pins, plugin docs, and `lsp-client.json` are in this clone. Trees are li
 
    In that session: `/lsp status`. Call `lsp_diagnostics` on a real file whose server is on PATH. Confirm the six tools exist.
 
-2. Read the loaded source. List every config path it reads (`~/.pi/lsp-client.json`, `.pi/lsp-client.json`, anything under the live agent dir). Classify each. If a path is outside the live agent dir, extend `just deploy` / `sidecars.json` so this clone stays SoT. Do not vendor the repo into `extensions/`.
+2. Read the loaded source. List every config path it reads (`~/.pi/lsp-client.json`, `.pi/lsp-client.json`, anything under the live agent dir). Classify each. If a path is outside the live agent dir, add it to `sidecars.json` at its `$HOME`-relative path so this clone stays SoT. Do not vendor the repo into `home/.pi/agent/extensions/`.
 
 3. Pin the unversioned source:
 

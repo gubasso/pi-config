@@ -1,7 +1,8 @@
 # Host landing for this source tree.
-# Nix installs the pi binary. Static payloads are copied. Files the
-# runtime mutates but this repo tracks (settings.json, keybindings.json,
-# classified plugin sidecars) are symlinked so writes go through to git.
+# Nix installs the pi binary. home/ mirrors $HOME, so every payload path
+# states its own destination. Static payloads are copied. Files the runtime
+# mutates but this repo tracks (settings.json, keybindings.json, classified
+# plugin sidecars) are symlinked so writes go through to git.
 
 src := justfile_directory()
 
@@ -43,6 +44,8 @@ deploy:
     #!/usr/bin/env bash
     set -euo pipefail
     src="{{ src }}"
+    payload="$src/home"
+    agent_src="$payload/.pi/agent"
     dest="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 
     store_owned() {
@@ -104,21 +107,21 @@ deploy:
       echo "linked $to -> $from"
     }
 
-    copy_file "$src/AGENTS.md" "$dest/AGENTS.md"
-    copy_dir_files "$src/prompts" "$dest/prompts"
+    copy_file "$agent_src/AGENTS.md" "$dest/AGENTS.md"
+    copy_dir_files "$agent_src/prompts" "$dest/prompts"
 
     for d in extensions themes skills agents; do
-      if [ -d "$src/$d" ]; then
-        copy_dir_files "$src/$d" "$dest/$d"
+      if [ -d "$agent_src/$d" ]; then
+        copy_dir_files "$agent_src/$d" "$dest/$d"
       fi
     done
-    if [ -f "$src/APPEND_SYSTEM.md" ]; then
-      copy_file "$src/APPEND_SYSTEM.md" "$dest/APPEND_SYSTEM.md"
+    if [ -f "$agent_src/APPEND_SYSTEM.md" ]; then
+      copy_file "$agent_src/APPEND_SYSTEM.md" "$dest/APPEND_SYSTEM.md"
     fi
 
-    link_tracked "$src/settings.json" "$dest/settings.json"
-    if [ -f "$src/keybindings.json" ]; then
-      link_tracked "$src/keybindings.json" "$dest/keybindings.json"
+    link_tracked "$agent_src/settings.json" "$dest/settings.json"
+    if [ -f "$agent_src/keybindings.json" ]; then
+      link_tracked "$agent_src/keybindings.json" "$dest/keybindings.json"
     fi
     python3 "$src/scripts/package-pins.py" land-sidecars "$src" "$dest"
 
@@ -129,38 +132,54 @@ doctor:
     #!/usr/bin/env bash
     set -euo pipefail
     src="{{ src }}"
+    payload="$src/home"
+    agent_src="$payload/.pi/agent"
     dest="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 
     fail() { echo "doctor: $*" >&2; exit 1; }
     ok() { echo "ok  $*"; }
 
-    for f in SPEC.md settings.json AGENTS.md AGENTS.override.md prompts/review.md .gitignore package.json flake.nix .envrc .pre-commit-config.yaml; do
+    for f in SPEC.md README.md AGENTS.md justfile .gitignore package.json flake.nix .envrc .pre-commit-config.yaml; do
       [ -f "$src/$f" ] || fail "missing $src/$f"
-      ok "source $f"
+      ok "meta $f"
+    done
+    [ ! -e "$src/AGENTS.override.md" ] || fail "AGENTS.override.md was replaced by the root AGENTS.md; delete it"
+
+    for f in .pi/agent/settings.json .pi/agent/AGENTS.md .pi/agent/prompts/review.md .pi/lsp-client.json; do
+      [ -f "$payload/$f" ] || fail "missing $payload/$f"
+      ok "payload $f"
     done
 
-    for line in auth.json web-search.json web-search-cache/ sessions/ npm/ git/ bin/ models.json trust.json; do
+    for line in /home/.pi/agent/auth.json /home/.pi/agent/web-search.json \
+      /home/.pi/agent/web-search-cache/ /home/.pi/agent/sessions/ \
+      /home/.pi/agent/npm/ /home/.pi/agent/git/ /home/.pi/agent/bin/ \
+      /home/.pi/agent/models.json /home/.pi/agent/trust.json \
+      /home/.pi/agent/intercom/broker.port.json; do
       grep -qxF "$line" "$src/.gitignore" || fail ".gitignore missing $line"
     done
     ok "gitignore lines"
 
-    for p in auth.json web-search.json web-search-cache/foo sessions/foo npm/foo git/foo bin/foo models.json trust.json models-store.json; do
+    for p in home/.pi/agent/auth.json home/.pi/agent/web-search.json \
+      home/.pi/agent/web-search-cache/foo home/.pi/agent/sessions/foo \
+      home/.pi/agent/npm/foo home/.pi/agent/git/foo home/.pi/agent/bin/foo \
+      home/.pi/agent/models.json home/.pi/agent/trust.json \
+      home/.pi/agent/models-store.json home/.pi/agent/intercom/broker.port.json; do
       git -C "$src" check-ignore -q --no-index "$p" || fail "not ignored: $p"
     done
     ok "check-ignore"
 
-    python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$src/settings.json" || fail "settings.json is not JSON"
+    python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$agent_src/settings.json" || fail "settings.json is not JSON"
     ok "settings.json json"
 
     python3 "$src/scripts/package-pins.py" prove-sidecars "$src" "$dest" || fail "plugin docs or sidecars"
 
-    if [ -L "$src/AGENTS.md" ]; then
-      t="$(readlink -f "$src/AGENTS.md" 2>/dev/null || readlink "$src/AGENTS.md")"
+    if [ -L "$agent_src/AGENTS.md" ]; then
+      t="$(readlink -f "$agent_src/AGENTS.md" 2>/dev/null || readlink "$agent_src/AGENTS.md")"
       case "$t" in
-        */nix/store*) fail "source AGENTS.md is a store symlink" ;;
+        */nix/store*) fail "source payload AGENTS.md is a store symlink" ;;
       esac
     fi
-    ok "source AGENTS.md not store"
+    ok "source payload AGENTS.md not store"
 
     if [ "${DOCTOR_SOURCE_ONLY:-}" = "1" ]; then
       exit 0
@@ -169,6 +188,14 @@ doctor:
     if [ -n "${PI_CODING_AGENT_DIR:-}" ]; then
       default="$(cd "$HOME/.pi/agent" 2>/dev/null && pwd -P || echo "$HOME/.pi/agent")"
       resolved="$(cd "$dest" 2>/dev/null && pwd -P || echo "$dest")"
+      clone="$(cd "$src" 2>/dev/null && pwd -P || echo "$src")"
+      # home/ mirrors $HOME, so home/.pi/agent looks like a valid live dir.
+      # It is not. This clone is source. SPEC.md §3 and §15 forbid the move.
+      case "$resolved" in
+        "$clone" | "$clone"/*)
+          fail "PI_CODING_AGENT_DIR points inside this clone ($resolved); the clone is source, not the live dir"
+          ;;
+      esac
       if [ "$resolved" != "$default" ]; then
         echo "warning: PI_CODING_AGENT_DIR=$PI_CODING_AGENT_DIR (physical $resolved) is not $default" >&2
       fi
@@ -203,21 +230,25 @@ doctor:
 
     [ -f "$dest/AGENTS.md" ] && [ ! -L "$dest/AGENTS.md" ] || fail "dest AGENTS.md is not a regular file"
     store_owned "$dest/AGENTS.md" && fail "dest AGENTS.md is a store symlink"
-    cmp -s "$src/AGENTS.md" "$dest/AGENTS.md" || fail "dest AGENTS.md does not match source"
+    cmp -s "$agent_src/AGENTS.md" "$dest/AGENTS.md" || fail "dest AGENTS.md does not match source"
     ok "dest AGENTS.md copy"
 
     [ -f "$dest/prompts/review.md" ] && [ ! -L "$dest/prompts/review.md" ] || fail "dest prompts/review.md is not a regular file"
     [ ! -L "$dest/prompts" ] || fail "dest prompts/ is a symlink; want a copied directory"
-    cmp -s "$src/prompts/review.md" "$dest/prompts/review.md" || fail "dest prompts/review.md does not match source"
+    cmp -s "$agent_src/prompts/review.md" "$dest/prompts/review.md" || fail "dest prompts/review.md does not match source"
     ok "dest prompts/review.md copy"
 
-    linked_to "$dest/settings.json" "$src/settings.json" "dest settings.json"
-    if [ -f "$src/keybindings.json" ]; then
-      linked_to "$dest/keybindings.json" "$src/keybindings.json" "dest keybindings.json"
+    linked_to "$dest/settings.json" "$agent_src/settings.json" "dest settings.json"
+    if [ -f "$agent_src/keybindings.json" ]; then
+      linked_to "$dest/keybindings.json" "$agent_src/keybindings.json" "dest keybindings.json"
     fi
 
-    [ ! -e "$dest/AGENTS.override.md" ] || fail "dest AGENTS.override.md must not exist"
-    ok "dest has no AGENTS.override.md"
+    # Migration guard for a host landed before the home/ move.
+    [ ! -e "$dest/AGENTS.override.md" ] || fail "dest AGENTS.override.md is stale; remove it"
+    if [ -f "$dest/AGENTS.md" ] && cmp -s "$src/AGENTS.md" "$dest/AGENTS.md"; then
+      fail "dest AGENTS.md is the clone-rules file, not the payload"
+    fi
+    ok "dest carries the payload AGENTS.md, not the clone rules"
 
     if [ -e "$dest/auth.json" ]; then
       [ -f "$dest/auth.json" ] && [ ! -L "$dest/auth.json" ] || fail "dest auth.json is not a regular file"
@@ -276,7 +307,9 @@ check:
     DOCTOR_SOURCE_ONLY=1 just doctor
     git -C "$src" ls-files -z | while IFS= read -r -d '' f; do
       case "$f" in
-        auth.json|web-search.json|web-search-cache/*|models.json|trust.json|models-store.json|sessions/*|npm/*|git/*|bin/*)
+        home/.pi/agent/auth.json | home/.pi/agent/web-search.json | home/.pi/agent/web-search-cache/* | \
+          home/.pi/agent/models.json | home/.pi/agent/trust.json | home/.pi/agent/models-store.json | \
+          home/.pi/agent/sessions/* | home/.pi/agent/npm/* | home/.pi/agent/git/* | home/.pi/agent/bin/*)
           echo "tracked secret or install tree: $f" >&2
           exit 1
           ;;

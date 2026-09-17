@@ -3,6 +3,6 @@
   "private": true,
   "keywords": ["pi-package"],
   "pi": {
-    "prompts": ["./prompts"]
+    "prompts": ["./home/.pi/agent/prompts"]
   }
 }

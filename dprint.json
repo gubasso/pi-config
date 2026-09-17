@@ -15,12 +15,12 @@
     ".direnv",
     "node_modules",
     "result",
-    "settings.json",
-    "pi-plan-mode.json",
-    "pi-review.json",
-    "99extensions.json",
-    "intercom/config.json",
-    "extensions/**/config.json"
+    "home/.pi/agent/settings.json",
+    "home/.pi/agent/pi-plan-mode.json",
+    "home/.pi/agent/pi-review.json",
+    "home/.pi/agent/99extensions.json",
+    "home/.pi/agent/intercom/config.json",
+    "home/.pi/agent/extensions/**/config.json"
   ],
   "plugins": [
     "https://plugins.dprint.dev/markdown-0.22.0.wasm",

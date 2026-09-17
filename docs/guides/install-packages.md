@@ -14,14 +14,14 @@ Do not install two packages that register the same tool names for the same job.
 
 ## What belongs where
 
-| Thing                       | Home                                                                                                       |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Pin (`npm:…`, `git:…`)      | `settings.json` `packages` in this clone                                                                   |
-| Install tree                | live `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/npm/` (or `git/`)                                            |
-| `copy` / `symlink` sidecars | this clone, same relative path as live (or `$HOME/.pi/<path>` when `root` is `pi-home`); deploy lands them |
-| `live-only` sidecars        | live agent dir only; gitignored; this clone stays blind                                                    |
-| Plugin findings             | `docs/plugins/<plugin-name>/` in this clone, not deployed                                                  |
-| Plugin cache                | live agent dir, never git                                                                                  |
+| Thing                       | Home                                                                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Pin (`npm:…`, `git:…`)      | `home/.pi/agent/settings.json` `packages` in this clone                                                   |
+| Install tree                | live `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/npm/` (or `git/`)                                           |
+| `copy` / `symlink` sidecars | this clone at `home/<path>`, where `<path>` is the package's own `$HOME`-relative path; deploy lands them |
+| `live-only` sidecars        | live agent dir only; gitignored; this clone stays blind                                                   |
+| Plugin findings             | `docs/plugins/<plugin-name>/` in this clone, not deployed                                                 |
+| Plugin cache                | live agent dir, never git                                                                                 |
 
 `settings.json` is already a symlink from the live dir into this clone. `pi install` writes the pin here. `just deploy` does not run `pi install` and does not copy `npm/`. It does land classified sidecars.
 
@@ -88,7 +88,7 @@ Confirm:
 ```bash
 pi list
 ls "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/npm"
-git -C /path/to/pi-config diff -- settings.json
+git -C /path/to/pi-config diff -- home/.pi/agent/settings.json
 ```
 
 Commit `settings.json` and the plugin docs when the pin is a decision you want on every host. Leave `npm/` untracked.

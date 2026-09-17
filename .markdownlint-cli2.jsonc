@@ -70,16 +70,16 @@
     //     MD025 (single top-level H1), MD041 (first-line H1) enforce doc discipline ---
     "MD013": false, // line length — dprint unwraps prose to one physical line
     "MD024": { "siblings_only": true }, // dup headings OK across sections, not within
-    "MD033": false, // inline HTML — AGENTS.md carries an HTML comment header
+    "MD033": false, // inline HTML — home/.pi/agent/AGENTS.md carries an HTML comment header
     "MD046": { "style": "fenced" } // require fenced code blocks
   },
   "customRules": ["markdownlint-rule-relative-links"],
-  // prompts/ holds payloads Pi sends to a model, not documents. A prompt
-  // opens with YAML frontmatter and then plain instructions, so MD041 asks
-  // for a heading that would only add noise to the prompt.
+  // home/.pi/agent/prompts/ holds payloads Pi sends to a model, not documents.
+  // A prompt opens with YAML frontmatter and then plain instructions, so MD041
+  // asks for a heading that would only add noise to the prompt.
   "ignores": [
     "node_modules/",
     ".direnv/",
-    "prompts/"
+    "home/.pi/agent/prompts/"
   ]
 }

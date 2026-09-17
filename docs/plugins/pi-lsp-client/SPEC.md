@@ -22,7 +22,7 @@ Resolver (`src/lsp/config-loader.ts` `getConfigPaths`):
 
 Project config wins over user config over builtins. `disabled: true` removes a builtin. An entry without `command` and `extensions` is ignored except for `disabled`.
 
-Source `lsp-client.json` adds servers this tree needs that are not pi-lsp-client builtins: `jsonls` (`.json`/`.jsonc`), `taplo` (`.toml`), `marksman` (`.md`). `biome` is disabled so it cannot claim JSON (dprint owns format here). Other builtins stay. `pyright`, `ruff`, `nixd`, `yaml-language-server`, and `bash-language-server` are PATH probes from the flake, not entries here.
+Source `home/.pi/lsp-client.json` adds servers this tree needs that are not pi-lsp-client builtins: `jsonls` (`.json`/`.jsonc`), `taplo` (`.toml`), `marksman` (`.md`). `biome` is disabled so it cannot claim JSON (dprint owns format here). Other builtins stay. `pyright`, `ruff`, `nixd`, `yaml-language-server`, and `bash-language-server` are PATH probes from the flake, not entries here.
 
 Do not run `/lsp install`. Servers are PATH probes (`src/lsp/server-installation.ts`). Auto-install recipes stay unused.
 
@@ -32,8 +32,8 @@ Cache: none under the agent dir. Language-server processes are session-lifetime,
 
 ## Class
 
-| Artifact                            | Class  | Why                                                                    |
-| ----------------------------------- | ------ | ---------------------------------------------------------------------- |
-| `lsp-client.json` (`root: pi-home`) | `copy` | No secrets; package only reads it. Dest is `$HOME/.pi/lsp-client.json` |
+| Artifact              | Class  | Why                                                                    |
+| --------------------- | ------ | ---------------------------------------------------------------------- |
+| `.pi/lsp-client.json` | `copy` | No secrets; package only reads it. Dest is `$HOME/.pi/lsp-client.json` |
 
 After install, `/reload` or start a new session.

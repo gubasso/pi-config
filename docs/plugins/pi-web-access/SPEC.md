@@ -29,8 +29,8 @@ Cache: live `web-search-cache/`. Not a sidecar. Never git.
 
 ## Class
 
-| Artifact          | Class       | Why                                                                 |
-| ----------------- | ----------- | ------------------------------------------------------------------- |
-| `web-search.json` | `live-only` | Can hold tokens; runtime also writes curator state. Sensitive wins. |
+| Artifact                    | Class       | Why                                                                 |
+| --------------------------- | ----------- | ------------------------------------------------------------------- |
+| `.pi/agent/web-search.json` | `live-only` | Can hold tokens; runtime also writes curator state. Sensitive wins. |
 
 Do not create `web-search.json` in this clone. Create the live file only when adding keys or routing, mode `0600`. After install, `/reload` or start a new session.

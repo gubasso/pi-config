@@ -19,10 +19,13 @@ import sys
 from urllib.parse import urlparse
 
 SIDECAR_CLASSES = {"live-only", "symlink", "copy"}
-SIDECAR_ROOTS = {"agent", "pi-home"}
+
+# home/ mirrors $HOME, so a sidecar path states its own destination.
+HOME_MIRROR = "home"
+AGENT_PREFIX = ".pi/agent/"
+
 SIDECAR_KEYS = {
     "path",
-    "root",
     "class",
     "sensitive",
     "runtimeWrites",
@@ -113,7 +116,7 @@ def frozen_ref(source: str, kind: str) -> str | None:
     return None
 
 
-def classify(source: str, src: str, dest: str) -> tuple[str, str, str]:
+def classify(source: str, base: str, dest: str) -> tuple[str, str, str]:
     if source.startswith("npm:"):
         name = npm_name(source[4:])
         tree = os.path.join(dest, "npm", "node_modules", name) if dest else ""
@@ -125,12 +128,12 @@ def classify(source: str, src: str, dest: str) -> tuple[str, str, str]:
         return "git", plugin_name(source, "git", git=git), tree
     path = source
     if not os.path.isabs(path):
-        path = os.path.normpath(os.path.join(src, path))
+        path = os.path.normpath(os.path.join(base, path))
     return "local", plugin_name(source, "local"), path
 
 
 def load_pins(src: str, dest: str) -> list[dict[str, str]]:
-    settings = json.load(open(os.path.join(src, "settings.json")))
+    settings = json.load(open(os.path.join(agent_payload_dir(src), "settings.json")))
     raw = settings.get("packages") or []
     if not isinstance(raw, list):
         raise SystemExit("settings.json packages must be an array")
@@ -140,7 +143,7 @@ def load_pins(src: str, dest: str) -> list[dict[str, str]]:
         pin = source_of(entry)
         if not pin:
             raise SystemExit("empty packages source")
-        kind, name, tree = classify(pin, src, dest)
+        kind, name, tree = classify(pin, agent_payload_dir(src), dest)
         if not name:
             raise SystemExit(f"pin {pin} produced an empty plugin name")
         if name in seen_names:
@@ -175,19 +178,31 @@ def relpath_ok(path: str) -> bool:
     return all(p and p not in (".", "..") for p in parts)
 
 
-def sidecar_root(row: dict[str, object]) -> str:
-    return str(row.get("root") or "agent")
+def sidecar_repo_path(rel: str) -> str:
+    """The one repo-relative path for a sidecar.
+
+    Every filesystem access and every `git -C src` call for a sidecar goes
+    through this, so the two can never disagree about which file they mean.
+    """
+    return f"{HOME_MIRROR}/{rel}"
 
 
 def sidecar_source_path(src: str, rel: str) -> str:
-    return os.path.join(src, rel)
+    return os.path.join(src, *sidecar_repo_path(rel).split("/"))
 
 
 def sidecar_dest_path(dest: str, row: dict[str, object]) -> str:
+    """A path under .pi/agent/ follows PI_CODING_AGENT_DIR. Anything else is $HOME."""
     rel = str(row["path"])
-    if sidecar_root(row) == "pi-home":
-        return os.path.join(os.path.expanduser("~"), ".pi", rel)
-    return os.path.join(dest, rel)
+    if rel.startswith(AGENT_PREFIX):
+        if not dest:
+            return ""
+        return os.path.join(dest, *rel[len(AGENT_PREFIX) :].split("/"))
+    return os.path.join(os.path.expanduser("~"), *rel.split("/"))
+
+
+def agent_payload_dir(src: str) -> str:
+    return os.path.join(src, HOME_MIRROR, ".pi", "agent")
 
 
 def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object]]:
@@ -210,24 +225,18 @@ def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object
             raise SystemExit(f"{path} sidecars[{i}] unknown keys: {sorted(extra)}")
         rel = entry.get("path")
         klass = entry.get("class")
-        root = entry.get("root", "agent")
         if not isinstance(rel, str) or not relpath_ok(rel):
             raise SystemExit(
                 f"{path} sidecars[{i}] path must be a relative path with no .."
             )
         rel = rel.replace("\\", "/")
-        if root not in SIDECAR_ROOTS:
-            raise SystemExit(
-                f"{path} sidecars[{i}] root must be one of {sorted(SIDECAR_ROOTS)}"
-            )
         if klass not in SIDECAR_CLASSES:
             raise SystemExit(
                 f"{path} sidecars[{i}] class must be one of {sorted(SIDECAR_CLASSES)}"
             )
-        key = f"{root}:{rel}"
-        if key in seen:
-            raise SystemExit(f"{path} duplicate sidecar path {rel} root {root}")
-        seen.add(key)
+        if rel in seen:
+            raise SystemExit(f"{path} duplicate sidecar path {rel}")
+        seen.add(rel)
         sensitive = entry.get("sensitive", False)
         runtime = entry.get("runtimeWrites", False)
         if sensitive not in (True, False) or runtime not in (True, False):
@@ -266,7 +275,6 @@ def load_plugin_sidecars(src: str, name: str, pin: str) -> list[dict[str, object
                 "plugin": name,
                 "pin": pin,
                 "path": rel,
-                "root": root,
                 "class": klass,
                 "sensitive": bool(sensitive),
                 "runtimeWrites": bool(runtime),
@@ -283,27 +291,28 @@ def load_sidecars(src: str, pins: list[dict[str, str]]) -> list[dict[str, object
     for pin in pins:
         for row in load_plugin_sidecars(src, pin["name"], pin["pin"]):
             rel = str(row["path"])
-            key = f"{sidecar_root(row)}:{rel}"
-            if key in seen_paths:
+            if rel in seen_paths:
                 raise SystemExit(
-                    f"duplicate sidecar path {rel} root {sidecar_root(row)} ({seen_paths[key]} and {row['pin']})"
+                    f"duplicate sidecar path {rel} ({seen_paths[rel]} and {row['pin']})"
                 )
-            seen_paths[key] = str(row["pin"])
+            seen_paths[rel] = str(row["pin"])
             rows.append(row)
     return rows
 
 
-def git_ignored(src: str, rel: str) -> bool:
+def git_ignored(src: str, repo_rel: str) -> bool:
+    """repo_rel comes from sidecar_repo_path()."""
     result = subprocess.run(
-        ["git", "-C", src, "check-ignore", "-q", "--no-index", rel],
+        ["git", "-C", src, "check-ignore", "-q", "--no-index", repo_rel],
         check=False,
     )
     return result.returncode == 0
 
 
-def git_tracked(src: str, rel: str) -> bool:
+def git_tracked(src: str, repo_rel: str) -> bool:
+    """repo_rel comes from sidecar_repo_path()."""
     result = subprocess.run(
-        ["git", "-C", src, "ls-files", "--error-unmatch", "--", rel],
+        ["git", "-C", src, "ls-files", "--error-unmatch", "--", repo_rel],
         check=False,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -360,9 +369,10 @@ def write_bytes(path: str, data: bytes) -> None:
         os.fsync(handle.fileno())
 
 
-def git_head_bytes(src: str, rel: str) -> bytes | None:
+def git_head_bytes(src: str, repo_rel: str) -> bytes | None:
+    """repo_rel comes from sidecar_repo_path()."""
     result = subprocess.run(
-        ["git", "-C", src, "show", f"HEAD:{rel}"],
+        ["git", "-C", src, "show", f"HEAD:{repo_rel}"],
         check=False,
         capture_output=True,
     )
@@ -419,11 +429,16 @@ def replace_with_hardlink(source_path: str, dest_path: str) -> str:
     return "copied"
 
 
-def land_atomic_sot(src: str, rel: str, source_path: str, dest_path: str) -> None:
+def land_atomic_sot(
+    src: str, repo_rel: str, rel: str, source_path: str, dest_path: str
+) -> None:
     source_bytes = read_bytes(source_path)
     dest_exists = os.path.isfile(dest_path) and not os.path.islink(dest_path)
     dest_bytes = read_bytes(dest_path) if dest_exists else None
-    base = git_head_bytes(src, rel)
+    # base is None when the path is absent from HEAD: a newly authored sidecar,
+    # or one staged but not yet committed. The merge below then has no base and
+    # falls through to the conflict message, which names that case.
+    base = git_head_bytes(src, repo_rel)
     if dest_bytes is None or dest_bytes == source_bytes:
         kind = replace_with_hardlink(source_path, dest_path)
         print(f"{kind} {dest_path}")
@@ -484,17 +499,18 @@ def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
     for row in sidecars:
         rel = str(row["path"])
         klass = str(row["class"])
+        repo_rel = sidecar_repo_path(rel)
         source_path = sidecar_source_path(src, rel)
         if klass == "live-only":
             if os.path.lexists(source_path):
                 raise SystemExit(f"live-only sidecar must not exist in source: {rel}")
-            if git_tracked(src, rel):
+            if git_tracked(src, repo_rel):
                 raise SystemExit(f"live-only sidecar is tracked: {rel}")
-            if not git_ignored(src, rel):
+            if not git_ignored(src, repo_rel):
                 raise SystemExit(f"live-only sidecar is not gitignored: {rel}")
             print(f"ok  sidecar live-only {rel}")
             continue
-        if git_ignored(src, rel):
+        if git_ignored(src, repo_rel):
             raise SystemExit(f"{klass} sidecar is gitignored: {rel}")
         if row["required"] and not os.path.isfile(source_path):
             raise SystemExit(f"missing source sidecar {rel} for {row['pin']}")
@@ -586,7 +602,7 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
             print(f"linked {dest_path} -> {source_path}")
             continue
         if row.get("followsSymlinks") is False:
-            land_atomic_sot(src, rel, source_path, dest_path)
+            land_atomic_sot(src, sidecar_repo_path(rel), rel, source_path, dest_path)
             continue
         if os.path.isdir(dest_path) and not os.path.islink(dest_path):
             raise SystemExit(f"refusing to replace directory {dest_path} with a copy")
@@ -617,7 +633,7 @@ def print_status(
         print(f"package {row['pin']} docs {docs_state} tree {tree_state} {pin_state}")
     for row in sidecars:
         rel = str(row["path"])
-        dest_path = sidecar_dest_path(dest, row) if dest else ""
+        dest_path = sidecar_dest_path(dest, row)
         if dest_path and os.path.islink(dest_path):
             state = "symlink"
         elif dest_path and os.path.isfile(dest_path):
@@ -625,9 +641,7 @@ def print_status(
             state = "hardlink" if same_inode(source_path, dest_path) else "file"
         else:
             state = "no"
-        root = sidecar_root(row)
-        root_bit = f" root {root}" if root != "agent" else ""
-        print(f"sidecar {rel}{root_bit} class {row['class']} dest {state}")
+        print(f"sidecar {rel} class {row['class']} dest {state}")
 
 
 def note_trees(pins: list[dict[str, str]]) -> None:

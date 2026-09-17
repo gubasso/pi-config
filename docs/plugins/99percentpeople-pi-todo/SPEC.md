@@ -32,8 +32,8 @@ SSH passwords used by other packages in this family, if ever installed, live in 
 
 ## Class
 
-| Artifact            | Class                                       | Why                                              |
-| ------------------- | ------------------------------------------- | ------------------------------------------------ |
-| `99extensions.json` | `copy` (`followsSymlinks: false`, hardlink) | No secrets; TUI writes; package refuses symlinks |
+| Artifact                      | Class                                       | Why                                              |
+| ----------------------------- | ------------------------------------------- | ------------------------------------------------ |
+| `.pi/agent/99extensions.json` | `copy` (`followsSymlinks: false`, hardlink) | No secrets; TUI writes; package refuses symlinks |
 
-Source `99extensions.json` holds explicit `todo` defaults. Deploy hardlinks dest to source. `/99settings` atomically replaces dest and breaks the hardlink; the next `just deploy` imports dest into source when only dest changed vs HEAD, then restores the hardlink. After install, `/reload` or start a new session.
+Source `home/.pi/agent/99extensions.json` holds explicit `todo` defaults. Deploy hardlinks dest to source. `/99settings` atomically replaces dest and breaks the hardlink; the next `just deploy` imports dest into source when only dest changed vs HEAD, then restores the hardlink. After install, `/reload` or start a new session.

@@ -51,8 +51,7 @@ Bump that line in a commit after `pi update --extensions` moves the tree and the
 {
   "sidecars": [
     {
-      "path": "relative/to-clone.json",
-      "root": "agent | pi-home",
+      "path": ".pi/agent/relative.json",
       "class": "live-only | symlink | copy",
       "sensitive": false,
       "runtimeWrites": true,
@@ -63,10 +62,10 @@ Bump that line in a commit after `pi update --extensions` moves the tree and the
 }
 ```
 
-`path` is relative to this clone. No `..`. `root` defaults to `agent` (dest is the live agent dir). `pi-home` dest is `$HOME/.pi/<path>`. `sensitive: true` requires `class: live-only`. `runtimeWrites: true` requires `class: symlink`, unless `followsSymlinks` is false, in which case `class` must be `copy` and deploy lands a hardlink (3-way sync against HEAD). `required` defaults to true for `copy` / `symlink` and is always false for `live-only`. Optional `copy` / `symlink` rows may omit the source file until we author one.
+`path` is relative to `$HOME`, which is what the package reads, and the source is tracked at `home/<path>`. A path under `.pi/agent/` lands at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/<rest>`; any other path lands at `$HOME/<path>`. No `..`. `sensitive: true` requires `class: live-only`. `runtimeWrites: true` requires `class: symlink`, unless `followsSymlinks` is false, in which case `class` must be `copy` and deploy lands a hardlink (3-way sync against HEAD). `required` defaults to true for `copy` / `symlink` and is always false for `live-only`. Optional `copy` / `symlink` rows may omit the source file until we author one.
 
 An empty `sidecars` array means the package was checked and has no config files this clone lands.
 
 ## Current packages
 
-Do not list pins here. Source of truth is `settings.json` `packages`. Each pin has a directory named by the rules above. `just check` proves the pairing and sidecar classes. `just status` reports whether the live tree and each sidecar dest exist.
+Do not list pins here. Source of truth is `home/.pi/agent/settings.json` `packages`. Each pin has a directory named by the rules above. `just check` proves the pairing and sidecar classes. `just status` reports whether the live tree and each sidecar dest exist.

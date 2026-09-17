@@ -1,13 +1,13 @@
 {
   "sidecars": [
     {
-      "path": "intercom/config.json",
+      "path": ".pi/agent/intercom/config.json",
       "class": "copy",
       "sensitive": false,
       "runtimeWrites": false
     },
     {
-      "path": "intercom/broker.port.json",
+      "path": ".pi/agent/intercom/broker.port.json",
       "class": "live-only",
       "sensitive": false,
       "runtimeWrites": false

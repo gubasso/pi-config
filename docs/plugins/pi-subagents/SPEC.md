@@ -30,9 +30,9 @@ Child sessions, run artifacts, and project schedules stay in the live agent dir 
 
 ## Class
 
-| Artifact                          | Class                | Why                                                  |
-| --------------------------------- | -------------------- | ---------------------------------------------------- |
-| `extensions/subagent/config.json` | `symlink`            | No secrets; runtime may write                        |
-| `subagent-tool-description.md`    | `copy`, not required | No secrets; we own the bytes; runtime does not write |
+| Artifact                                    | Class                | Why                                                  |
+| ------------------------------------------- | -------------------- | ---------------------------------------------------- |
+| `.pi/agent/extensions/subagent/config.json` | `symlink`            | No secrets; runtime may write                        |
+| `.pi/agent/subagent-tool-description.md`    | `copy`, not required | No secrets; we own the bytes; runtime does not write |
 
-Source `extensions/subagent/config.json` stays `{}` until this operator sets fleet/timeout/async policy. Child roles are the `subagents` object in `settings.json`. Do not author `subagent-tool-description.md` until custom tool prose is wanted. After a settings change, `/reload` or start a new session. Then `/subagents-models` shows the live map.
+Source `home/.pi/agent/extensions/subagent/config.json` stays `{}` until this operator sets fleet/timeout/async policy. Child roles are the `subagents` object in `settings.json`. Do not author `subagent-tool-description.md` until custom tool prose is wanted. After a settings change, `/reload` or start a new session. Then `/subagents-models` shows the live map.

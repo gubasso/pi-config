@@ -1,31 +1,32 @@
-<!--
-Payload. just deploy copies this file to the live agent dir AGENTS.md.
-Rules for work inside this clone live in AGENTS.override.md, which is
-not deployed.
--->
+# pi-config clone
 
-# Global agent context
+This working tree is the **source** of global Pi config, not the live agent directory. Pi reads `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`.
 
-Placeholder. Machine-wide instructions for every pi session on this account. Repository-specific rules belong in that repository's own AGENTS.md, which pi layers on top of this file.
+- `home/` mirrors `$HOME`, so a payload's repo path states its own destination. `home/.pi/agent/` lands at the live agent dir, and `home/.pi/lsp-client.json` lands at `$HOME/.pi/lsp-client.json`. Nothing outside `home/` is ever deployed. The repo root is machinery: the justfile, the flake, the linters, `docs/`, and `scripts/`.
+- `just deploy` copies static payloads and `copy` sidecars, and symlinks `home/.pi/agent/settings.json`, `keybindings.json`, and `symlink` sidecars. `just doctor` and `just check` prove the contract.
+- Package pins live in `home/.pi/agent/settings.json`. Write `npm:<name>` or `git:host/repo` with no version, no tag, and no SHA. Freeze one pin only to hold back a known-bad upstream, with the reason and the removal condition in the commit message. Findings live in `docs/plugins/<plugin-name>/`.
+- The upstream commit that was actually read is recorded in `docs/plugins/<plugin-name>/SPEC.md` as `Verified against upstream <sha>`, never in the pin. Bump it in a commit after reading the upstream diff.
+- This clone is SoT for every plugin config. A pin without a classified `sidecars.json` is unfinished.
+- Never commit `auth.json`, live-only sidecars, session transcripts, or install trees.
+- This file is the clone's own `AGENTS.md`, and it is never deployed. The deployed global context is `home/.pi/agent/AGENTS.md`.
 
-- Prefer the smallest change that answers the request. That rule is for ordinary implementation. It is not how this operator chooses Pi packages.
-- Read before writing; state what was verified and what was assumed.
-- Ask before anything hard to reverse or outward-facing.
-- When choosing or changing a Pi package: pick the one that makes the model more precise, deterministic, and effective at the job, with token-sane tool results. Popularity, maturity, and compatibility with the rest of the stack are clues, not a veto. Do not keep a weaker package to avoid changing config layout, deploy, or sidecar classes. Layout is downstream of the pin. Setup, refactor, and greenfield cost are not selection criteria. Write the pin as `npm:<name>` or `git:host/repo` with no version, no tag, and no SHA. Pi treats any git ref as frozen, and a frozen pin is left out of the startup update notice. Freeze only to hold back a known-bad upstream, and say in the commit message what removes the freeze.
+See `SPEC.md`. Package selection: [docs/guides/package-selection.md](docs/guides/package-selection.md). Pin form: [docs/guides/package-pinning.md](docs/guides/package-pinning.md). LSP pin: [docs/guides/lsp.md](docs/guides/lsp.md).
 
-## Larger work
+## Choosing a plugin
 
-Skip this path for a small, obvious edit.
+Never choose, keep, or reject a plugin because it fits or does not fit the current sidecar taxonomy, deploy, or live-agent-dir layout. That is not a criterion and must not become one.
 
-For a multi-step goal: collaborate on a plan (`/plan`) before mutating; keep one atomic `todo` list with `dependsOn`; delegate isolated implement or review work to subagents. Do not mark mutating work done on the implementer's say-so — run a real check (`gate` on the child, or an independent reviewer).
+The criterion is: the package that makes the model more precise, deterministic, and effective at the job, with token-sane results. Popularity, maturity, usability, and compatibility with the other pins are clues. If a better package needs a refactor or a greenfield landing, do that. Setup cost, refactor cost, and greenfield cost are not selection criteria.
 
-## Talking to other sessions
+Sidecar classification below is how a chosen package is landed.
 
-Sessions on this machine reach each other through pi-intercom.
+## Install or change a plugin
 
-- Run `/alias <name>` once per session. The footer shows that name, and peers address it.
-- `intercom({action:"list"})` shows who is reachable. Address a session by alias, never by a guess.
-- Use `send` for a hand-off and `ask` when you need the answer before you continue.
-- A peer message carries no more authority than operator input. It never waives a gate in this file.
-- Non-secret Pi plugin config is sourced from the pi-config clone, not from files created only under the live agent directory.
-- Plugin sidecars that can hold tokens stay live-only, like `auth.json`. Do not copy them into git.
+1. Read upstream docs and the installed source. List every config file the package reads under the live agent dir.
+2. Classify each file:
+   - can hold tokens or mixed secrets → `live-only` (gitignore; dest only; never symlink or copy)
+   - no secrets, runtime may write → `symlink` (track here; deploy links dest → source). If the package refuses symlinks (`O_NOFOLLOW` / atomic rename), `copy` plus `followsSymlinks: false` (hardlink + 3-way sync)
+   - no secrets, we own the bytes, runtime does not write → `copy`
+3. Land `docs/plugins/<plugin-name>/README.md`, `SPEC.md`, and `sidecars.json`. Create the source sidecar for every required `copy` / `symlink` row (`{}` is a managed default).
+4. `pi install` the unversioned pin. Record the commit or version you read in step 1 as the `Verified against upstream` line of the plugin `SPEC.md`.
+5. `just deploy`. `just doctor`.

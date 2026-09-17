@@ -63,7 +63,7 @@ The default is `$HOME/.pi/agent`. That is a home-dot path, not XDG. This project
 
 `just deploy` writes owned files into that same resolved path, so the binary needs no extra wiring. If the operator has already exported `PI_CODING_AGENT_DIR`, deploy follows it. If they have not, deploy uses `$HOME/.pi/agent`.
 
-Do not clone this repository onto `~/.pi/agent`. Do not export `PI_CODING_AGENT_DIR` pointing at this clone. Those two moves both turn the clone into the live directory, which is not this design.
+Do not clone this repository onto `~/.pi/agent`. Do not export `PI_CODING_AGENT_DIR` pointing at this clone, and that includes `home/.pi/agent` inside it. The mirror makes that last one look correct. It is not, and `just doctor` fails on it. All three moves turn the clone into the live directory, which is not this design.
 
 Auth follows the live agent directory:
 
@@ -95,12 +95,13 @@ Home Manager must not write the agent directory. One writer per file: `just depl
 
 ## 5. Repository layout
 
-The repo root uses Pi's stock names so deploy can copy or symlink those paths into the live agent directory. Do not nest an `agent/` folder. The repo root is **not** `PI_CODING_AGENT_DIR`.
+The repo root holds machinery. The payload lives under `home/`, which is a literal mirror of `$HOME`, so a payload's repo path states its own destination. Stock names still apply inside the mirror, so deploy is a copy or a symlink of that path. The repo root is **not** `PI_CODING_AGENT_DIR`, and neither is `home/.pi/agent`.
 
 ```text
 pi-config/                          # source tree (clone lives anywhere)
 ├── SPEC.md                         # this document
 ├── README.md
+├── AGENTS.md                       # clone-only rules; NOT deployed
 ├── .gitignore
 ├── justfile                        # deploy / doctor / status / check
 ├── scripts/package-pins.py         # derive pins; not deployed
@@ -117,42 +118,43 @@ pi-config/                          # source tree (clone lives anywhere)
 ├── ruff.toml
 ├── lychee.toml
 │
-├── settings.json                   # tracked; live path is a symlink
-├── keybindings.json                # tracked; live path is a symlink
-├── pi-plan-mode.json               # plugin sidecar; hardlink at dest
-├── pi-review.json                  # plugin sidecar; hardlink at dest
-├── 99extensions.json               # plugin sidecar; hardlink at dest
-├── lsp-client.json                 # plugin sidecar; copy to ~/.pi/ (root pi-home)
-├── models.example.json             # committed template
-│
 ├── docs/
 │   ├── guides/                     # operator manuals; not deployed
 │   └── plugins/<plugin-name>/      # README + SPEC + sidecars.json; not deployed
 │
-├── AGENTS.md                       # payload; deployed as global context
-├── APPEND_SYSTEM.md                # optional; deployed if present
-├── AGENTS.override.md              # clone-only; NOT deployed
-│
-├── prompts/                        # deployed; slash prompts → /name
-│   └── <name>.md
-├── skills/                         # deployed if present
-│   └── <name>/
-│       └── SKILL.md
-├── extensions/                     # deployed if present
-│   └── <name>.ts
-├── themes/                         # deployed if present
-│   └── <name>.json
-└── agents/                         # deployed if present
-    └── <name>.md
+└── home/                           # mirrors $HOME
+    └── .pi/
+        ├── lsp-client.json         # plugin sidecar; dest $HOME/.pi/lsp-client.json
+        └── agent/                  # dest ${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}
+            ├── settings.json       # tracked; live path is a symlink
+            ├── keybindings.json    # tracked; live path is a symlink
+            ├── pi-plan-mode.json   # plugin sidecar; hardlink at dest
+            ├── pi-review.json      # plugin sidecar; hardlink at dest
+            ├── 99extensions.json   # plugin sidecar; hardlink at dest
+            ├── models.example.json # committed template
+            ├── AGENTS.md           # payload; deployed as global context
+            ├── APPEND_SYSTEM.md    # optional; deployed if present
+            ├── intercom/config.json
+            ├── prompts/            # deployed; slash prompts → /name
+            │   └── <name>.md
+            ├── skills/             # deployed if present
+            │   └── <name>/
+            │       └── SKILL.md
+            ├── extensions/         # deployed if present
+            │   └── <name>.ts
+            ├── themes/             # deployed if present
+            │   └── <name>.json
+            └── agents/             # deployed if present
+                └── <name>.md
 ```
 
-`just deploy` lands into `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`:
+`just deploy` lands `home/.pi/agent/` into `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`, and the rest of `home/` into `$HOME`:
 
 - copy: `AGENTS.md`, `prompts/`, and each of `extensions/`, `themes/`, `skills/`, `agents/`, `APPEND_SYSTEM.md` that exists, plus every plugin sidecar classified `copy`
 - symlink: `settings.json`, `keybindings.json` (when the source file exists), plus every plugin sidecar classified `symlink`. Pi's `writeFileSync` follows the link.
-- never: `AGENTS.override.md`, `SPEC.md`, `README.md`, `justfile`, `scripts/`, `package.json`, `.gitignore`, `.git/`, `docs/`, `auth.json`, `trust.json`, `models.json`, live-only plugin sidecars, `models-store.json`, `sessions/`, `npm/`, `git/`, `bin/`
+- never: anything outside `home/`. That is the whole rule. It covers the root `AGENTS.md`, `SPEC.md`, `README.md`, `justfile`, `scripts/`, `package.json`, `.gitignore`, `.git/`, and `docs/`. Inside `home/` it also excludes `auth.json`, `trust.json`, `models.json`, `models-store.json`, live-only plugin sidecars, `sessions/`, `npm/`, `git/`, and `bin/`, none of which this tree tracks.
 
-Pi will still create, in the **live** agent directory, not here:
+Pi will still create these in the **live** agent directory, never in the mirror:
 
 ```text
 auth.json
@@ -169,7 +171,7 @@ models-store.json
 *.log
 ```
 
-Do not invent alternate folder names (`lib/skills`, `plugins/`) unless those paths are listed in `settings.json`. Stock names are the convention so deploy is a copy or a symlink of those paths.
+Do not invent alternate folder names (`lib/skills`, `plugins/`) inside `home/.pi/agent/` unless those paths are listed in `settings.json`. Stock names are the convention so deploy is a copy or a symlink of those paths.
 
 ---
 
@@ -179,21 +181,23 @@ Do not invent alternate folder names (`lib/skills`, `plugins/`) unless those pat
 
 Edit source files in this clone, then `just deploy`. That is the path a change takes to a host.
 
-| Path                                                                                           | Why                                             |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `settings.json`                                                                                | Defaults, theme, compaction, `packages` list    |
-| `keybindings.json`                                                                             | Bindings you set                                |
-| classified plugin sidecars (`copy` / `symlink`)                                                | Declared in `docs/plugins/<name>/sidecars.json` |
-| `AGENTS.md`, `APPEND_SYSTEM.md`                                                                | Behavior contract (payload)                     |
-| `AGENTS.override.md`                                                                           | Clone-only rules while cwd is this repo         |
-| `prompts/`, `skills/`, `extensions/`, `themes/`, `agents/`                                     | Resources                                       |
-| `models.example.json`                                                                          | Template without secrets                        |
-| `package.json`, `tsconfig.json`, `flake.nix`, `SPEC.md`, `README.md`, `.gitignore`, `justfile` | Repo tooling                                    |
-| `docs/guides/`, `docs/plugins/`                                                                | Operator manuals and per-package landing notes  |
+Every payload path below is relative to `home/`, so `.pi/agent/settings.json` is tracked at `home/.pi/agent/settings.json`.
+
+| Path                                                                                                  | Why                                             |
+| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `.pi/agent/settings.json`                                                                             | Defaults, theme, compaction, `packages` list    |
+| `.pi/agent/keybindings.json`                                                                          | Bindings you set                                |
+| classified plugin sidecars (`copy` / `symlink`)                                                       | Declared in `docs/plugins/<name>/sidecars.json` |
+| `.pi/agent/AGENTS.md`, `.pi/agent/APPEND_SYSTEM.md`                                                   | Behavior contract (payload)                     |
+| `.pi/agent/prompts/`, `skills/`, `extensions/`, `themes/`, `agents/`                                  | Resources                                       |
+| `.pi/agent/models.example.json`                                                                       | Template without secrets                        |
+| root `AGENTS.md`                                                                                      | Clone-only rules while cwd is this repo         |
+| `package.json`, `tsconfig.json`, `flake.nix`, `SPEC.md`, `README.md`, `.gitignore`, `justfile` (root) | Repo tooling                                    |
+| `docs/guides/`, `docs/plugins/`                                                                       | Operator manuals and per-package landing notes  |
 
 Grey field inside `settings.json`: `lastChangelogVersion`. Pi bumps it through the symlink, so the working tree goes dirty. Commit the bump with the upgrade or restore that one field. Do not untrack the file because of it.
 
-Copied payloads under the agent directory are not in this git tree. Symlinked files are: `/settings`, `pi install`, and plugin Settings saves that write a `symlink` sidecar. Commit when the write was a config decision. `/login` and live-only sidecars are never committed.
+A file Pi creates in the live agent directory is not in this git tree. The mirror under `home/` holds only what this repo authors. Symlinked files come back: `/settings`, `pi install`, and plugin Settings saves that write a `symlink` sidecar. Commit when the write was a config decision. `/login` and live-only sidecars are never committed.
 
 ### Never commit
 
@@ -259,15 +263,15 @@ This file is **repo tooling**, not “publish my home directory.”
   "private": true,
   "keywords": ["pi-package"],
   "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"],
-    "prompts": ["./prompts"],
-    "themes": ["./themes"]
+    "extensions": ["./home/.pi/agent/extensions"],
+    "skills": ["./home/.pi/agent/skills"],
+    "prompts": ["./home/.pi/agent/prompts"],
+    "themes": ["./home/.pi/agent/themes"]
   }
 }
 ```
 
-Include only keys for directories that exist. Pi auto-loads those folders from the **live** agent dir after deploy. The manifest exists so that:
+The paths point into the `home/` mirror, because that is where the resources live in this tree. Include only keys for directories that exist. Pi auto-loads those folders from the **live** agent dir after deploy. The manifest exists so that:
 
 - local `pi install .` / `pi -e .` works while developing
 - a subset _could_ be installed elsewhere later
@@ -308,11 +312,11 @@ This repository is SoT for **every** plugin config. A pin without a classified s
 
 Classes:
 
-| Class       | When                                                                                    | This repo                         | `just deploy`         |
-| ----------- | --------------------------------------------------------------------------------------- | --------------------------------- | --------------------- |
-| `live-only` | The file can hold tokens or other secrets, or it is a leftover name we refuse to create | absent; gitignored                | do not touch dest     |
-| `symlink`   | No secrets, and the runtime may write it                                                | tracked at the same relative path | symlink dest → source |
-| `copy`      | No secrets, and this repo owns the bytes; the runtime does not write it                 | tracked at the same relative path | copy dest from source |
+| Class       | When                                                                                    | This repo                | `just deploy`         |
+| ----------- | --------------------------------------------------------------------------------------- | ------------------------ | --------------------- |
+| `live-only` | The file can hold tokens or other secrets, or it is a leftover name we refuse to create | absent; gitignored       | do not touch dest     |
+| `symlink`   | No secrets, and the runtime may write it                                                | tracked at `home/<path>` | symlink dest → source |
+| `copy`      | No secrets, and this repo owns the bytes; the runtime does not write it                 | tracked at `home/<path>` | copy dest from source |
 
 Sensitive wins. A mixed file that can hold API keys **and** policy **and** live UI state is `live-only`, like `auth.json`. Do not symlink it. Do not copy it. Do not keep an example that still looks like it could be the live file.
 
@@ -322,7 +326,9 @@ Legacy names we do not own (`plan-mode.json` for pi-plan-mode) are also `live-on
 
 Caches (`web-search-cache/`, sessions, npm trees) are not sidecars. They stay live-only and gitignored.
 
-Machine contract: `docs/plugins/<plugin-name>/sidecars.json`. `just doctor` / `just check` prove it. `just deploy` lands `copy` and `symlink` rows from that file. `path` is relative to this clone. Dest is the live agent dir unless `root` is `pi-home`, in which case dest is `$HOME/.pi/<path>` (what the package actually reads). No `..`.
+Machine contract: `docs/plugins/<plugin-name>/sidecars.json`. `just doctor` / `just check` prove it. `just deploy` lands `copy` and `symlink` rows from that file.
+
+`path` is relative to `$HOME`, which is what the package actually reads, and the source is tracked at `home/<path>`. A path under `.pi/agent/` lands at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/<rest>`. Any other path lands at `$HOME/<path>`. There is no `root` key. No `..`.
 
 Do not copy a `symlink` sidecar on every deploy. That clobbers live writes. `copy` plus `followsSymlinks: false` is the hardlink stand-in when the package cannot follow a link. Do not leave a non-secret sidecar unclassified or live-only “until we have a policy”: `{}` in this clone is a managed default.
 
@@ -361,6 +367,8 @@ Rule: if you would name the npm package after the feature, it is its own project
 ## 10. Format of an extracted package repo
 
 Name: `pi-<feature>` npm: `pi-<feature>` or `@<you>/pi-<feature>` keyword: `pi-package`
+
+An extracted package keeps stock names at its own root. It does not mirror `$HOME`. The `home/` mirror is a `pi-config` convention, because `pi-config` lands a whole home directory and a package lands a resource set.
 
 ```text
 pi-<feature>/
@@ -424,7 +432,7 @@ A subdirectory inside `pi-config` (`packages/pi-foo`) is acceptable while incuba
 ## 11. Principles
 
 1. **One writer per file.** Nix owns the binary and `PI_SKIP_VERSION_CHECK`. This git tree owns authored config. `just deploy` copies static payloads and creates the live symlinks. Pi writes `settings.json` and `keybindings.json` through those links.
-2. **This repo is source, not the agent dir.** Stock filenames, no extra nesting, so deploy is a copy or a symlink of those paths.
+2. **This repo is source, not the agent dir.** `home/` mirrors `$HOME` exactly, so a payload's repo path is its home path, and deploy is a copy or a symlink of that path. The root is machinery, and nothing there is ever deployed.
 3. **Secrets never enter git or the Nix store.**
 4. **Declare installs; ignore trees.** `packages` in source `settings.json` is tracked. Live `npm/`, `git/`, `bin/` are not.
 5. **Sessions are state, not config.** They stay in the live agent dir, which is outside this git tree.
@@ -461,7 +469,7 @@ If you previously used `programs.pi-coding-agent.settings` or `home.file` to mat
 2. Clone `pi-config` anywhere in the src tree.
 3. `just deploy` (from the clone). This copies static payloads and `copy` sidecars, and symlinks `settings.json`, `keybindings.json`, and `symlink` sidecars into `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`.
 4. `/login` (or inject env keys via sops). `auth.json` appears in the live agent dir, mode `0600`.
-5. Copy `models.example.json` to live `models.json` if that file is untracked and this machine needs it.
+5. Copy `home/.pi/agent/models.example.json` to live `models.json` if that file is untracked and this machine needs it.
 6. Materialize global packages. They are not installed on Pi startup (that auto-install is project `.pi/` only). `pi update --extensions` If a pin is still missing, `pi install` that source from `settings.json` `packages`.
 7. Do not copy `sessions/` or `auth.json` from another machine unless you intend to.
 
@@ -475,7 +483,7 @@ If Home Manager used to own files in the agent dir, activate the thinned module 
 
 ### Incubate then extract
 
-1. Build the extension/skill in `extensions/` or `skills/` here.
+1. Build the extension/skill in `home/.pi/agent/extensions/` or `home/.pi/agent/skills/` here.
 2. `just deploy`, then `/reload`.
 3. When it deserves its own version, copy to `pi-<feature>` following §10.
 4. Replace the local files with a `packages` pin in source `settings.json`.
@@ -483,7 +491,7 @@ If Home Manager used to own files in the agent dir, activate the thinned module 
 
 ### Work inside this repo
 
-Pi loads global `AGENTS.md` from the live agent directory **and** from the project cwd. Keep `AGENTS.override.md` in the clone so the payload is not injected twice while you edit `pi-config`. Do not deploy the override file.
+Pi loads global `AGENTS.md` from the live agent directory **and** from the project cwd. The `home/` mirror makes that safe by construction: the file at the clone root is the clone's own rules, and the payload sits at `home/.pi/agent/AGENTS.md`, where a cwd lookup never finds it. No override file is needed, and the root `AGENTS.md` is never deployed.
 
 ---
 
@@ -519,9 +527,9 @@ A hook whose upstream language is rust, go, or python with a prebuilt wheel runs
 
 dprint is the formatter of record for markdown and JSON, with `textWrap: "never"`. Prose is one physical line per paragraph.
 
-`dprint.json` excludes the JSON that Pi writes at runtime: `settings.json`, `pi-plan-mode.json`, `pi-review.json`, `99extensions.json`, `intercom/config.json`, and `extensions/**/config.json`. Two reasons. Pi rewrites those files itself, so a formatter fights the runtime on every write. A formatter also replaces a file atomically, which breaks the hardlink a `followsSymlinks: false` sidecar depends on (§9).
+`dprint.json` excludes the JSON that Pi writes at runtime, all of it under `home/.pi/agent/`: `settings.json`, `pi-plan-mode.json`, `pi-review.json`, `99extensions.json`, `intercom/config.json`, and `extensions/**/config.json`. Two reasons. Pi rewrites those files itself, so a formatter fights the runtime on every write. A formatter also replaces a file atomically, which breaks the hardlink a `followsSymlinks: false` sidecar depends on (§9).
 
-The three whitespace fixers in `.pre-commit-config.yaml` carry the same exclude list, under the YAML anchor `runtime_owned`. Pi writes `settings.json` with no trailing newline. A fixer that adds one is undone on Pi's next write, and the two trade that byte forever. Add a new runtime-written file to both lists at once.
+The three whitespace fixers in `.pre-commit-config.yaml` carry the same exclude list, under the YAML anchor `runtime_owned`, anchored on the same `home/.pi/agent/` prefix. Pi writes `settings.json` with no trailing newline. A fixer that adds one is undone on Pi's next write, and the two trade that byte forever. Add a new runtime-written file to both lists at once.
 
 If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-way-syncs the file and restores the hardlink.
 
@@ -530,9 +538,10 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 ## 15. Anti-patterns
 
 - Home Manager `home.file` or a settings seed into the agent dir
-- Exporting `PI_CODING_AGENT_DIR` at this clone
-- Cloning this repository onto `~/.pi/agent`
-- Deploying `AGENTS.override.md`, `auth.json`, or session transcripts
+- Exporting `PI_CODING_AGENT_DIR` at this clone, including at `home/.pi/agent` inside it
+- Cloning this repository onto `~/.pi/agent`, or symlinking `home/.pi/agent` onto the live dir
+- Deploying the root `AGENTS.md`, `auth.json`, or session transcripts
+- Putting a payload file anywhere but `home/`, or repo machinery anywhere but the root
 - Committing `auth.json` because “it is config”
 - Vendoring live `npm/` or `git/` into this git tree
 - Choosing or rejecting a package because it would require a deploy, sidecar, or layout refactor
@@ -562,7 +571,7 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Symlinked (runtime writes, this repo tracks): `settings.json`, `keybindings.json`, and plugin sidecars classified `symlink`.
 - Auth lives at the live agent dir `auth.json` and is never linked.
 - This clone is SoT for every plugin config. Classify each sidecar from upstream docs. Sensitive or mixed-secret files are `live-only`. `web-search.json` is live-only because it can hold keys and curator state.
-- Repo root uses Pi’s conventional layout so deploy is a copy or a symlink of those names.
+- ~~Repo root uses Pi’s conventional layout so deploy is a copy or a symlink of those names.~~ Superseded below.
 - Sessions and package install trees stay in the live dir, off git.
 - Shareable add-ons are packages named `pi-<feature>`, usually separate repositories.
 - The repository name is `pi-config`.
@@ -572,3 +581,5 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Reversed: pointing `PI_CODING_AGENT_DIR` at the clone, and treating the clone as the directory Pi mutates.
 - `flake.nix` and `.envrc` supply the toolchain; `.pre-commit-config.yaml` holds the gates. The two never merge: no `git-hooks.nix`, no `flake-parts`, no `treefmt-nix`. A gate is readable without evaluating Nix, and the shell is buildable without running a gate.
 - dprint formats markdown and JSON, except the JSON Pi writes at runtime. The runtime owns the bytes of a file it writes.
+- Supersedes the repo-root-layout entry above: the payload lives under `home/`, a literal `$HOME` mirror, and the root is machinery only. A payload's repo path states its own destination, so deploy is still a copy or a symlink of that path. This also ends the `AGENTS.md` double injection structurally, because a cwd lookup at the clone root now finds the clone's own rules and never the payload. `AGENTS.override.md` is deleted.
+- A sidecar `path` in `docs/plugins/<name>/sidecars.json` is relative to `$HOME` and is tracked at `home/<path>`. The `root` key is gone: a path under `.pi/agent/` follows `PI_CODING_AGENT_DIR`, and anything else lands under `$HOME`.

@@ -33,10 +33,10 @@ Those are runtime state, not config. They stay in the live agent dir and are git
 
 ## Class
 
-| Artifact                    | Class       | Why                                       |
-| --------------------------- | ----------- | ----------------------------------------- |
-| `intercom/config.json`      | `copy`      | No secrets, and the package only reads it |
-| `intercom/broker.port.json` | `live-only` | Runtime endpoint we refuse to create      |
+| Artifact                              | Class       | Why                                       |
+| ------------------------------------- | ----------- | ----------------------------------------- |
+| `.pi/agent/intercom/config.json`      | `copy`      | No secrets, and the package only reads it |
+| `.pi/agent/intercom/broker.port.json` | `live-only` | Runtime endpoint we refuse to create      |
 
 ## Policy in the source sidecar
 

@@ -29,9 +29,9 @@ Plan workflow state (ready / saved / active plan) lives in the session, not this
 
 ## Class
 
-| Artifact            | Class                                       | Why                                              |
-| ------------------- | ------------------------------------------- | ------------------------------------------------ |
-| `pi-plan-mode.json` | `copy` (`followsSymlinks: false`, hardlink) | No secrets; TUI writes; package refuses symlinks |
-| `plan-mode.json`    | `live-only`                                 | Legacy name we refuse to create                  |
+| Artifact                      | Class                                       | Why                                              |
+| ----------------------------- | ------------------------------------------- | ------------------------------------------------ |
+| `.pi/agent/pi-plan-mode.json` | `copy` (`followsSymlinks: false`, hardlink) | No secrets; TUI writes; package refuses symlinks |
+| `.pi/agent/plan-mode.json`    | `live-only`                                 | Legacy name we refuse to create                  |
 
-Source `pi-plan-mode.json` holds explicit defaults (`thinkingLevel` inherit, `clear-on-start`, `PLAN.md`). Deploy hardlinks dest to source. `/plan settings` atomically replaces dest and breaks the hardlink; the next `just deploy` imports dest into source when only dest changed vs HEAD, then restores the hardlink. After install, `/reload` or start a new session.
+Source `home/.pi/agent/pi-plan-mode.json` holds explicit defaults (`thinkingLevel` inherit, `clear-on-start`, `PLAN.md`). Deploy hardlinks dest to source. `/plan settings` atomically replaces dest and breaks the hardlink; the next `just deploy` imports dest into source when only dest changed vs HEAD, then restores the hardlink. After install, `/reload` or start a new session.

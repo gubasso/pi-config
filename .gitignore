@@ -1,22 +1,30 @@
-auth.json
-web-search.json
-web-search-cache/
-plan-mode.json
-intercom/broker.sock
-intercom/broker.pid
-intercom/broker.port.json
-intercom/broker.spawn.lock
-intercom/broker-launch.vbs
-intercom/pending-asks/
-intercom/extension-state/
+# Live agent dir mirror. home/.pi/agent/ lands at ${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}.
+# The leading slash anchors each name to that one path, not repo-wide, so the
+# ignore file states the live tree's shape instead of hiding stray files anywhere.
+/home/.pi/agent/auth.json
+/home/.pi/agent/web-search.json
+/home/.pi/agent/web-search-cache/
+/home/.pi/agent/plan-mode.json
+/home/.pi/agent/models.json
+/home/.pi/agent/mcp-cache.json
+/home/.pi/agent/trust.json
+/home/.pi/agent/models-store.json
+/home/.pi/agent/sessions/
+/home/.pi/agent/npm/
+/home/.pi/agent/git/
+/home/.pi/agent/bin/
+/home/.pi/agent/intercom/broker.sock
+/home/.pi/agent/intercom/broker.pid
+/home/.pi/agent/intercom/broker.port.json
+/home/.pi/agent/intercom/broker.spawn.lock
+/home/.pi/agent/intercom/broker-launch.vbs
+/home/.pi/agent/intercom/pending-asks/
+/home/.pi/agent/intercom/extension-state/
+
+# Repo-wide
 .env
 .env.*
 !.env.example
-models.json
-sessions/
-npm/
-git/
-bin/
 node_modules/
 *.log
 
@@ -27,6 +35,3 @@ node_modules/
 
 # lychee link-check verdict cache
 .lycheecache
-mcp-cache.json
-trust.json
-models-store.json

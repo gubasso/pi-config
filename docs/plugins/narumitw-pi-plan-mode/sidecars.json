@@ -1,14 +1,14 @@
 {
   "sidecars": [
     {
-      "path": "pi-plan-mode.json",
+      "path": ".pi/agent/pi-plan-mode.json",
       "class": "copy",
       "sensitive": false,
       "runtimeWrites": true,
       "followsSymlinks": false
     },
     {
-      "path": "plan-mode.json",
+      "path": ".pi/agent/plan-mode.json",
       "class": "live-only",
       "sensitive": false,
       "runtimeWrites": false

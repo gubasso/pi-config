@@ -1,7 +1,7 @@
 {
   "sidecars": [
     {
-      "path": "99extensions.json",
+      "path": ".pi/agent/99extensions.json",
       "class": "copy",
       "sensitive": false,
       "runtimeWrites": true,
