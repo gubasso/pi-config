@@ -146,6 +146,10 @@ deploy:
 
     just doctor
 
+# Land, then show what deploy would remove, without removing it
+deploy-report:
+    PI_CONFIG_PRUNE=report just deploy
+
 # Prove the source tree, and the landing when dest exists
 doctor:
     #!/usr/bin/env bash

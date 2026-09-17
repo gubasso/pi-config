@@ -346,7 +346,11 @@ def record(how: str, path: str) -> None:
 
 
 def record_new_dirs(dest: str, dest_path: str) -> None:
-    """Record each directory strictly under dest that landing dest_path creates.
+    """Record every directory strictly under dest that dest_path needs.
+
+    Recorded on every deploy, not only when the directory is created. A row
+    that appeared only on the run that made the directory would be missing
+    from the next manifest, and prune would then read it as stale.
 
     Only components under dest are recorded. $HOME/.pi is never one, so an
     undeclared lsp-client.json removes the file and leaves ~/.pi alone.
@@ -355,11 +359,11 @@ def record_new_dirs(dest: str, dest_path: str) -> None:
         return
     dest_abs = os.path.abspath(dest)
     parent = os.path.dirname(os.path.abspath(dest_path))
-    missing = []
-    while parent.startswith(dest_abs + os.sep) and not os.path.isdir(parent):
-        missing.append(parent)
+    parts = []
+    while parent.startswith(dest_abs + os.sep):
+        parts.append(parent)
         parent = os.path.dirname(parent)
-    for path in reversed(missing):
+    for path in reversed(parts):
         record("dir", path)
 
 
@@ -826,11 +830,113 @@ def manifest_source(dest: str) -> str:
     return str(data.get("source") or "") if isinstance(data, dict) else ""
 
 
+def prune_mode() -> str:
+    mode = os.environ.get("PI_CONFIG_PRUNE", "apply")
+    if mode not in ("apply", "report"):
+        raise SystemExit(f"PI_CONFIG_PRUNE must be apply or report, got {mode!r}")
+    return mode
+
+
+def live_only_dests(dest: str, sidecars: list[dict[str, object]]) -> set[str]:
+    out = set()
+    for row in sidecars:
+        if str(row["class"]) != "live-only":
+            continue
+        path = sidecar_dest_path(dest, row)
+        if path:
+            out.add(os.path.realpath(path))
+    return out
+
+
+def classify_stale(
+    src: str, dest: str, target: str, how: str, protected: set[str]
+) -> str:
+    """Decide what to do with one path the repo no longer declares.
+
+    First match wins. A verdict of "prune" is the only one that deletes.
+    """
+    real = os.path.realpath(target)
+    if real in protected:
+        return "keep"
+    dest_abs = os.path.abspath(dest)
+    pi_home = os.path.join(os.path.expanduser("~"), ".pi")
+    src_abs = os.path.realpath(src)
+    inside = target.startswith(dest_abs + os.sep) or target.startswith(pi_home + os.sep)
+    if not inside or target in (dest_abs, pi_home, os.path.expanduser("~")):
+        raise SystemExit(f"refusing to prune outside the landing roots: {target}")
+    if real == src_abs or real.startswith(src_abs + os.sep):
+        raise SystemExit(f"refusing to prune inside the clone: {target}")
+    if os.path.basename(target) == MANIFEST_NAME:
+        return "keep"
+    if not os.path.lexists(target):
+        return "gone"
+    if store_owned(target):
+        raise SystemExit(f"refusing to prune a store symlink: {target}")
+    if how != "dir" and os.path.isdir(target) and not os.path.islink(target):
+        return "refused"
+    return "prune"
+
+
 def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
-    """Record what this deploy landed. Pruning arrives in a later commit."""
+    """Land the recorded set, then remove what the repo no longer declares."""
+    mode = prune_mode()
     landed = read_run_manifest()
+    old = read_manifest(dest)
+    keep = {os.path.realpath(path) for path, _ in landed}
+    protected = live_only_dests(dest, sidecars)
+
+    stale = [row for row in old if os.path.realpath(row["path"]) not in keep]
+    verdicts = [
+        (
+            row["path"],
+            row["how"],
+            classify_stale(src, dest, row["path"], row["how"], protected),
+        )
+        for row in stale
+    ]
+
+    pruned = 0
+    print(f"pi-config: converging files ({len(landed)} declared, {len(stale)} stale)")
+    for target, how, verdict in verdicts:
+        if verdict == "keep":
+            continue
+        if verdict == "gone":
+            print(f"  gone    {how:<8} {target}")
+            continue
+        if verdict == "refused":
+            print(f"  refused {how:<8} {target} (now a directory)")
+            continue
+        if mode == "report":
+            print(f"  would-prune {how:<8} {target}")
+            continue
+        print(f"  prune   {how:<8} {target}")
+
+    if mode == "apply":
+        for target, how, verdict in verdicts:
+            if verdict != "prune" or how == "dir":
+                continue
+            os.remove(target)
+            pruned += 1
+        # Deepest first, so a nested pair empties before its parent.
+        dirs = sorted(
+            (t for t, how, v in verdicts if v == "prune" and how == "dir"),
+            key=lambda p: p.count(os.sep),
+            reverse=True,
+        )
+        for target in dirs:
+            try:
+                os.rmdir(target)
+                pruned += 1
+            except OSError as exc:
+                if exc.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOTDIR):
+                    raise
+                print(f"  kept    not-empty {target}")
+
+    if mode == "report":
+        print("pi-config: report only; manifest not written")
+        return
     write_manifest(src, dest, landed)
-    print(f"pi-config: files converged ({len(landed)} declared)")
+    print(f"pi-config: files converged ({len(landed)} declared, {pruned} removed)")
 
 
 def usage() -> None:
