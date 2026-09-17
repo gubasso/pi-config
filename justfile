@@ -285,6 +285,7 @@ doctor:
       ok "dest auth.json mode 600"
     fi
 
+    python3 "$src/scripts/package-pins.py" prove-manifest "$src" "$dest"
     python3 "$src/scripts/package-pins.py" note-trees "$src" "$dest"
 
 # Show source, dest, and whether live files exist

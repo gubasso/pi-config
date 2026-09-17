@@ -766,6 +766,66 @@ def write_manifest(src: str, dest: str, landed: list[tuple[str, str]]) -> None:
     write_bytes(manifest_path(dest), body.encode("utf-8"))
 
 
+def prove_manifest(src: str, dest: str) -> None:
+    """Prove the deployed extent matches the manifest.
+
+    Content is already proved by doctor and prove_sidecars_landing. This
+    proves extent: that every path deploy recorded is still there, in the
+    shape deploy left it.
+    """
+    path = manifest_path(dest)
+    if not os.path.isfile(path):
+        print(f"note: no deploy manifest at {dest}; run just deploy")
+        return
+    rows = read_manifest(dest)
+    if not rows:
+        raise SystemExit(f"{path} carries no usable paths")
+
+    dest_abs = os.path.abspath(dest)
+    pi_home = os.path.join(os.path.expanduser("~"), ".pi")
+    for row in rows:
+        target, how = row["path"], row["how"]
+        if not (
+            target.startswith(dest_abs + os.sep) or target.startswith(pi_home + os.sep)
+        ):
+            raise SystemExit(f"manifest path escapes the landing roots: {target}")
+        if how == "dir":
+            if not os.path.isdir(target):
+                raise SystemExit(f"manifest dir missing: {target}")
+        elif how == "symlink":
+            if not os.path.islink(target):
+                raise SystemExit(f"manifest symlink missing: {target}")
+            if store_owned(target):
+                raise SystemExit(f"manifest symlink is store-owned: {target}")
+        elif not os.path.isfile(target) or os.path.islink(target):
+            raise SystemExit(f"manifest copy missing or not a regular file: {target}")
+
+    # Coverage, the direction that catches a landing site added without a
+    # record call. These three are unconditional in deploy, so a manifest
+    # that omits any of them means the run file was incomplete.
+    recorded = {row["path"] for row in rows}
+    for expected in ("AGENTS.md", "prompts/review.md", "settings.json"):
+        target = os.path.join(dest_abs, *expected.split("/"))
+        if target not in recorded:
+            raise SystemExit(
+                f"manifest does not record {expected}; a landing went unrecorded"
+            )
+
+    # A moved or worktree clone is legal, so this is a note, never a failure.
+    written_by = manifest_source(dest)
+    if written_by and os.path.abspath(written_by) != os.path.abspath(src):
+        print(f"note: manifest was written by {written_by}", file=sys.stderr)
+    print(f"ok  deployed extent ({len(rows)} paths)")
+
+
+def manifest_source(dest: str) -> str:
+    try:
+        data = json.load(open(manifest_path(dest), encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return ""
+    return str(data.get("source") or "") if isinstance(data, dict) else ""
+
+
 def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
     """Record what this deploy landed. Pruning arrives in a later commit."""
     landed = read_run_manifest()
@@ -775,7 +835,7 @@ def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
 
 def usage() -> None:
     raise SystemExit(
-        "usage: package-pins.py emit|prove-docs|prove-sidecars|land-sidecars|converge|status|note-trees SRC DEST"
+        "usage: package-pins.py emit|prove-docs|prove-sidecars|land-sidecars|converge|prove-manifest|status|note-trees SRC DEST"
     )
 
 
@@ -809,6 +869,9 @@ def main() -> None:
         return
     if mode == "converge":
         converge(src, dest, sidecars)
+        return
+    if mode == "prove-manifest":
+        prove_manifest(src, dest)
         return
     if mode == "status":
         print_status(src, dest, pins, sidecars)
