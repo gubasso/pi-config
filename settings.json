@@ -20,5 +20,17 @@
     "git:github.com/tmustier/pi-queue-steer",
     "npm:pi-worktrunk",
     "npm:pi-better-edit"
-  ]
+  ],
+  "subagents": {
+    "defaultThinking": "medium",
+    "agentOverrides": {
+      "scout": { "thinking": "low" },
+      "researcher": { "thinking": "low" },
+      "worker": { "model": "inherit", "thinking": "medium" },
+      "delegate": { "model": "inherit", "thinking": "medium" },
+      "reviewer": { "thinking": "high" },
+      "oracle": { "thinking": "high" },
+      "evidence-auditor": { "thinking": "high" }
+    }
+  }
 }

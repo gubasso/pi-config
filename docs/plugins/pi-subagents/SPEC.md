@@ -22,7 +22,7 @@ The file is policy, not secrets:
 | Policy     | `timeoutMs`, `fleetView`, `asyncByDefault`, spawn caps | operator or package |
 | Live state | none in this file                                      | —                   |
 
-Settings-level keys (`subagents.defaultModel`, `agentScanDirs`, `modelScope`, …) live in source `settings.json` if added. They are not this sidecar.
+Settings-level keys live in source `settings.json`, not this sidecar. This clone pins `subagents.defaultThinking` (`medium`) and `subagents.agentOverrides` for the builtins: scout and researcher `thinking: low`; worker and delegate `model: inherit` plus `thinking: medium`; reviewer, oracle, and evidence-auditor `thinking: high`. Same model as the parent (`xai/grok-4.6`). No `subagents.defaultModel`. Other settings keys (`agentScanDirs`, `modelScope`, …) stay unset.
 
 Optional custom tool prose: `subagent-tool-description.md` at the agent-dir root (project config dir first, then `~/.pi/agent/subagent-tool-description.md`). The package does not write it.
 
@@ -35,4 +35,4 @@ Child sessions, run artifacts, and project schedules stay in the live agent dir 
 | `extensions/subagent/config.json` | `symlink`            | No secrets; runtime may write                        |
 | `subagent-tool-description.md`    | `copy`, not required | No secrets; we own the bytes; runtime does not write |
 
-Source `extensions/subagent/config.json` is `{}` until this operator sets policy. Do not author `subagent-tool-description.md` until custom tool prose is wanted. After install, `/reload` or start a new session.
+Source `extensions/subagent/config.json` stays `{}` until this operator sets fleet/timeout/async policy. Child roles are the `subagents` object in `settings.json`. Do not author `subagent-tool-description.md` until custom tool prose is wanted. After a settings change, `/reload` or start a new session. Then `/subagents-models` shows the live map.
