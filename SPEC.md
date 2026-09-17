@@ -271,10 +271,18 @@ This file is **repo tooling**, not “publish my home directory.”
 }
 ```
 
-The paths point into the `home/` mirror, because that is where the resources live in this tree. Include only keys for directories that exist. Pi auto-loads those folders from the **live** agent dir after deploy. The manifest exists so that:
+The real file carries only `prompts`. Add a key when its directory exists.
 
-- local `pi install .` / `pi -e .` works while developing
+The paths point into the `home/` mirror, because that is where the resources live in this tree. A nested path under a dot directory is valid, and the reason is exact: `package-manager.js` treats an entry as a glob only when it contains `*` or `?`. Every other entry resolves with `resolve(root, entry)` and then walks that directory. Upstream states the rule at `package-manager.js:137`: "Glob entries discover visible paths; exact entries can target dot paths or symlinked trees."
+
+**Never write a glob into this manifest.** `expandPackageGlob` drops any match whose path has a segment starting with `.`, so a pattern under `home/.pi/` matches nothing and fails silently. Keep every entry exact.
+
+Pi auto-loads those folders from the **live** agent dir after deploy. The manifest exists so that:
+
 - a subset _could_ be installed elsewhere later
+- `pi install .` records this clone as a package while developing
+
+`pi -e <path>` loads one extension file. It does not read this manifest, so it is not a test of these paths. Neither `pi install` nor `pi list` validates a manifest path either: both accept a directory that does not exist. The resolution above is read from the installed Pi 0.85.1 source. A session that lists `/review` from the manifest is still unproven, and it is not needed, because `just deploy` is what lands the prompts.
 
 Do not treat `pi install git:github.com/<you>/pi-config` as the primary distribution path. That command loads resources from conventional dirs; it does **not** cleanly install your `settings.json`, `AGENTS.md`, or secrets — and it _will_ expose whatever you failed to exclude. Host landing is `just deploy`.
 
@@ -527,7 +535,7 @@ A hook whose upstream language is rust, go, or python with a prebuilt wheel runs
 
 dprint is the formatter of record for markdown and JSON, with `textWrap: "never"`. Prose is one physical line per paragraph.
 
-`dprint.json` excludes the JSON that Pi writes at runtime, all of it under `home/.pi/agent/`: `settings.json`, `pi-plan-mode.json`, `pi-review.json`, `99extensions.json`, `intercom/config.json`, and `extensions/**/config.json`. Two reasons. Pi rewrites those files itself, so a formatter fights the runtime on every write. A formatter also replaces a file atomically, which breaks the hardlink a `followsSymlinks: false` sidecar depends on (§9).
+`dprint.json` excludes the JSON that Pi writes at runtime, all of it under `home/.pi/agent/`: `settings.json`, `keybindings.json`, `pi-plan-mode.json`, `pi-review.json`, `99extensions.json`, `intercom/config.json`, and `extensions/**/config.json`. Two reasons. Pi rewrites those files itself, so a formatter fights the runtime on every write. A formatter also replaces a file atomically, which breaks the hardlink a `followsSymlinks: false` sidecar depends on (§9).
 
 The three whitespace fixers in `.pre-commit-config.yaml` carry the same exclude list, under the YAML anchor `runtime_owned`, anchored on the same `home/.pi/agent/` prefix. Pi writes `settings.json` with no trailing newline. A fixer that adds one is undone on Pi's next write, and the two trade that byte forever. Add a new runtime-written file to both lists at once.
 

@@ -21,6 +21,10 @@
 /home/.pi/agent/intercom/pending-asks/
 /home/.pi/agent/intercom/extension-state/
 
+# Project-level Pi state written while working in this clone.
+# pi-review keeps per-run diffs and manifests here. State, not config.
+/.pi/pi-review/
+
 # Repo-wide
 .env
 .env.*
