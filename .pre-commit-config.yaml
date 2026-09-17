@@ -46,7 +46,7 @@ repos:
       # the one in dprint.json.
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md] # keep two-space hard breaks
-        exclude: &runtime_owned '^home/\.pi/agent/(settings\.json|keybindings\.json|pi-plan-mode\.json|pi-review\.json|99extensions\.json|intercom/config\.json|extensions/.*/config\.json)$'
+        exclude: &runtime_owned '^home/\.pi/agent/(settings\.json|keybindings\.json|pi-plan-mode\.json|99extensions\.json|intercom/config\.json|extensions/.*/config\.json)$'
       - id: end-of-file-fixer
         exclude: *runtime_owned
       - id: mixed-line-ending

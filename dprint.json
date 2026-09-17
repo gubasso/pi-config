@@ -18,7 +18,6 @@
     "home/.pi/agent/settings.json",
     "home/.pi/agent/keybindings.json",
     "home/.pi/agent/pi-plan-mode.json",
-    "home/.pi/agent/pi-review.json",
     "home/.pi/agent/99extensions.json",
     "home/.pi/agent/intercom/config.json",
     "home/.pi/agent/extensions/**/config.json"
