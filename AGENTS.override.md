@@ -3,7 +3,7 @@
 This working tree is the **source** of global Pi config, not the live agent directory. Pi reads `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`.
 
 - `just deploy` copies static payloads and `copy` sidecars, and symlinks `settings.json`, `keybindings.json`, and `symlink` sidecars. `just doctor` and `just check` prove the contract.
-- Package pins live in `settings.json`. Findings live in `docs/plugins/<plugin-name>/`.
+- Package pins live in `settings.json`. Write `npm:<name>` or `git:host/repo` with no version and no SHA unless the operator explicitly asks to freeze. Findings live in `docs/plugins/<plugin-name>/`.
 - This clone is SoT for every plugin config. A pin without a classified `sidecars.json` is unfinished.
 - Never commit `auth.json`, live-only sidecars, session transcripts, or install trees.
 - Never deploy this override file.

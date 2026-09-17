@@ -11,7 +11,7 @@ Placeholder. Machine-wide instructions for every pi session on this account. Rep
 - Prefer the smallest change that answers the request. That rule is for ordinary implementation. It is not how this operator chooses Pi packages.
 - Read before writing; state what was verified and what was assumed.
 - Ask before anything hard to reverse or outward-facing.
-- When choosing or changing a Pi package: pick the one that makes the model more precise, deterministic, and effective at the job, with token-sane tool results. Popularity, maturity, and compatibility with the rest of the stack are clues, not a veto. Do not keep a weaker package to avoid changing config layout, deploy, or sidecar classes. Layout is downstream of the pin. Setup, refactor, and greenfield cost are not selection criteria.
+- When choosing or changing a Pi package: pick the one that makes the model more precise, deterministic, and effective at the job, with token-sane tool results. Popularity, maturity, and compatibility with the rest of the stack are clues, not a veto. Do not keep a weaker package to avoid changing config layout, deploy, or sidecar classes. Layout is downstream of the pin. Setup, refactor, and greenfield cost are not selection criteria. Write the pin as `npm:<name>` or `git:host/repo` with no version and no SHA unless the operator explicitly asks to freeze.
 
 ## Larger work
 

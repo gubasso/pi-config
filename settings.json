@@ -18,6 +18,7 @@
     "git:github.com/code-yeongyu/pi-ast-grep@4a7d1beee684d96a6890e5fc55710bb63fecca85",
     "npm:@georgedong32/pi-review",
     "git:github.com/tmustier/pi-queue-steer@1f67c4c83e364538f347fdc8c2005c38eaaf8536",
-    "npm:pi-worktrunk"
+    "npm:pi-worktrunk",
+    "npm:pi-better-edit"
   ]
 }

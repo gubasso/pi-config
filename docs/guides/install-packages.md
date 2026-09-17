@@ -63,9 +63,11 @@ Examples:
 
 ```bash
 pi install npm:pi-web-access
-pi install npm:@scope/pkg@1.2.3
-pi install git:github.com/user/repo@v1
+pi install npm:@scope/pkg
+pi install git:github.com/user/repo
 ```
+
+Leave the source unversioned. Freeze only when the operator asks: `npm:@scope/pkg@1.2.3`, `git:github.com/user/repo@<sha-or-tag>`. Contract: [package-selection.md](./package-selection.md) and [SPEC.md](../../SPEC.md) §9.
 
 Pi then:
 

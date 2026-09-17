@@ -28,6 +28,14 @@ A clue can change the order of two packages that do the same job equally well. A
 
 If a better package reads config outside `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`, extend deploy. Do not reject the package. Do not vendor its source into this git tree.
 
+## Pin form
+
+Write `npm:<name>` or `git:<host>/<repo>` with no version and no git SHA.
+
+Float until the operator explicitly asks to freeze. Then write `npm:<name>@<version>` or `git:<host>/<repo>@<sha-or-tag>`.
+
+Do not freeze because the package owns a critical tool, because a release might break, or because another pin already has a SHA. Existing frozen pins stay until that pin is revisited.
+
 ## After the pin is chosen
 
 Then classify sidecars and land them. That work is mandatory. It is not the reason the pin won.

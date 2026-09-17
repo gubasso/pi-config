@@ -292,6 +292,10 @@ Sidecar classification below is **how** a chosen package is landed. It is never 
 
 Do not install two packages that register the same tool names for the same job.
 
+### Pin form
+
+The `packages` entry is the unversioned source: `npm:<name>` or `git:github.com/<user>/<repo>`. Do not add `@version` or a git SHA unless the operator explicitly asks to freeze that pin. Floating pins move with `pi update --extensions`. A freeze is a later decision on that pin, not the default. Existing frozen pins stay until that pin is revisited.
+
 ### Sidecar config files
 
 This repository is SoT for **every** plugin config. A pin without a classified sidecar list is unfinished. Read upstream docs and the installed source, list every config file the package reads, then land one class per file. If the package reads a path outside the live agent dir, extend deploy to land that path from this clone. Do not reject the package. Do not vendor the package source into this git tree to dodge the path.
@@ -526,6 +530,7 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Committing `auth.json` because “it is config”
 - Vendoring live `npm/` or `git/` into this git tree
 - Choosing or rejecting a package because it would require a deploy, sidecar, or layout refactor
+- Adding `@version` or a git SHA to a `packages` pin unless the operator explicitly asked to freeze that pin
 - Leaving a plugin pin without `docs/plugins/<name>/sidecars.json`
 - Treating the live agent dir as SoT for a non-secret plugin sidecar
 - Symlinking a sidecar that can hold tokens
