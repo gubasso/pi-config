@@ -122,7 +122,9 @@ if has_tests "*.bats"; then
     filters+=(--filter-tags "$c,$venue")
   done
   set +e
-  bats --recursive "${filters[@]}" "$scope"
+  # Selecting nothing is a legitimate outcome of a tag filter, the same way
+  # pytest's exit 5 is. Only a failing test is a failure.
+  bats --recursive --allow-empty-suite "${filters[@]}" "$scope"
   status=$?
   set -e
   note_result bats "$status"
@@ -138,7 +140,7 @@ fi
 if has_tests "*.test.ts"; then
   ran=$((ran + 1))
   set +e
-  vitest run --root . "$scope"
+  vitest run --root . --passWithNoTests "$scope"
   status=$?
   set -e
   note_result vitest "$status"
