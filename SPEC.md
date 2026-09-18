@@ -107,7 +107,7 @@ pi-config/                          # source tree (clone lives anywhere)
 ├── AGENTS.md                       # clone-only rules; NOT deployed
 ├── .gitignore
 ├── justfile                        # deploy / doctor / status / check
-├── scripts/package-pins.py         # derive pins; not deployed
+├── scripts/pi_config.py            # the engine; not deployed
 ├── package.json                    # private; optional pi manifest
 ├── tsconfig.json                   # for local TypeScript extensions
 ├── flake.nix                       # devShell: every tool a recipe or hook calls

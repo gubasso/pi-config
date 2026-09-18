@@ -6,6 +6,12 @@
 
 src := justfile_directory()
 
+# Every recipe reaches the engine as `python3 -m pi_config`, so scripts/ has
+# to be importable. Setting it here means one declaration rather than one per
+# call site, and it is also what lets the test suite import the same module
+# the recipes run.
+export PYTHONPATH := src / "scripts"
+
 # List available recipes
 default:
     @just --list
@@ -79,7 +85,7 @@ deploy:
     # Before anything lands. A symlinked landing root would silently redirect
     # every copy and every symlink below it, and a guard that only ran at prune
     # time would fire after the damage.
-    python3 "$src/scripts/package-pins.py" prove-roots "$src" "$dest"
+    python3 -m pi_config prove-roots "$src" "$dest"
 
     mkdir -p "$dest"
     dest="$(cd "$dest" && pwd -P)"
@@ -163,14 +169,14 @@ deploy:
     if [ -f "$agent_src/keybindings.json" ]; then
       link_tracked "$agent_src/keybindings.json" "$dest/keybindings.json"
     fi
-    python3 "$src/scripts/package-pins.py" land-sidecars "$src" "$dest"
-    python3 "$src/scripts/package-pins.py" converge "$src" "$dest"
+    python3 -m pi_config land-sidecars "$src" "$dest"
+    python3 -m pi_config converge "$src" "$dest"
 
     just doctor
 
     # Last, because pi remove runs npm and can need the network. A failure
     # here leaves the config correct and only an install tree orphaned.
-    python3 "$src/scripts/package-pins.py" converge-trees "$src" "$dest"
+    python3 -m pi_config converge-trees "$src" "$dest"
 
 # Land, then show what deploy would remove, without removing it
 deploy-report:
@@ -226,7 +232,7 @@ doctor:
     python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$agent_src/settings.json" || fail "settings.json is not JSON"
     ok "settings.json json"
 
-    python3 "$src/scripts/package-pins.py" prove-sidecars "$src" "$dest" || fail "plugin docs or sidecars"
+    python3 -m pi_config prove-sidecars "$src" "$dest" || fail "plugin docs or sidecars"
 
     if [ -L "$agent_src/AGENTS.md" ]; then
       t="$(readlink -f "$agent_src/AGENTS.md" 2>/dev/null || readlink "$agent_src/AGENTS.md")"
@@ -320,8 +326,8 @@ doctor:
       ok "dest auth.json mode 600"
     fi
 
-    python3 "$src/scripts/package-pins.py" prove-manifest "$src" "$dest"
-    python3 "$src/scripts/package-pins.py" note-trees "$src" "$dest"
+    python3 -m pi_config prove-manifest "$src" "$dest"
+    python3 -m pi_config note-trees "$src" "$dest"
 
 # Show source, dest, and whether live files exist
 status:
@@ -356,7 +362,7 @@ status:
     describe "$dest/AGENTS.md" "dest AGENTS.md"
     describe "$dest/settings.json" "dest settings.json"
     describe "$dest/auth.json" "dest auth.json"
-    python3 "$src/scripts/package-pins.py" status "$src" "$dest"
+    python3 -m pi_config status "$src" "$dest"
     if command -v pi >/dev/null 2>&1; then
       echo "pi $(command -v pi)"
     else
