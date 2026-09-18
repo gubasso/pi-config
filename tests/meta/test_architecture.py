@@ -29,6 +29,7 @@ LAYERS = {
     "sidecars": 2,
     "prune": 2,
     "status": 2,
+    "converge": 3,
     "landing": 3,
     "trees": 3,
     "doctor": 4,

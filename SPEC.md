@@ -518,7 +518,7 @@ If you previously used `programs.pi-coding-agent.settings` or `home.file` to mat
 5. Copy `home/.pi/agent/models.example.json` to live `models.json` if that file is untracked and this machine needs it.
 6. Materialize global packages. They are not installed on Pi startup (that auto-install is project `.pi/` only). `pi update --extensions` If a pin is still missing, `pi install` that source from `settings.json` `packages`.
 7. Do not copy `sessions/` or `auth.json` from another machine unless you intend to.
-8. On a host landed before the deploy manifest existed, the first deploy prints `unmanaged` notes. Read them, then run `just deploy-adopt` once.
+8. On a host landed before the deploy manifest existed, the first deploy prints `unmanaged` notes. Read them, then run `just deploy-adopt` once. Some notes name a path adopt leaves, because it sits inside a directory deploy never landed. The line says so, and an operator removes that path by hand.
 
 If Home Manager used to own files in the agent dir, activate the thinned module **before** `just deploy`. Deploy refuses when `AGENTS.md` or `prompts` is a store symlink.
 
@@ -600,8 +600,9 @@ scripts/
     ├── pins.py                  # reading the `packages` array
     ├── manifest.py              # what a run landed, recorded as it lands
     ├── sidecars.py              # what a sidecar declaration means
-    ├── prune.py                 # removing, and refusing to remove
+    ├── prune.py                 # what may be removed, and what was never landed
     ├── status.py                # what the operator sees
+    ├── converge.py              # one convergence pass over the destination
     ├── landing.py               # putting a classified sidecar in place
     ├── trees.py                 # install-tree convergence via `pi remove`
     ├── doctor.py                # the proofs
@@ -613,15 +614,15 @@ scripts/
 
 Modules import downward only. A module may import from a strictly lower layer and never from its own or a higher one, which makes a cycle impossible by construction rather than by review.
 
-| Layer | Modules                       |
-| ----- | ----------------------------- |
-| 0     | `paths`, `fsx`, `gitx`        |
-| 1     | `pins`, `manifest`            |
-| 2     | `sidecars`, `prune`, `status` |
-| 3     | `landing`, `trees`            |
-| 4     | `doctor`                      |
-| 5     | `deploy`, `check`             |
-| 6     | `__main__`                    |
+| Layer | Modules                        |
+| ----- | ------------------------------ |
+| 0     | `paths`, `fsx`, `gitx`         |
+| 1     | `pins`, `manifest`             |
+| 2     | `sidecars`, `prune`, `status`  |
+| 3     | `converge`, `landing`, `trees` |
+| 4     | `doctor`                       |
+| 5     | `deploy`, `check`              |
+| 6     | `__main__`                     |
 
 One behavior has one implementation. `store_owned` lived three times across two languages before this, which meant three chances to get the Home Manager refusal wrong.
 
@@ -745,7 +746,8 @@ Full manual: [docs/guides/testing.md](./docs/guides/testing.md).
 - The deploy manifest at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/.pi-config-manifest.json` records what deploy created. Prune considers only paths in it. The manifest is trusted state rather than proof, so a runtime-owned name is vetoed before deletion whatever the manifest claims, and the landing roots are policy derived in code rather than fields read back from that file.
 - The manifest is recorded as a side effect of landing, never recomputed. A parallel enumeration would have to repeat the `live-only` and optional-absent skips, and a divergence there deletes a secret-bearing sidecar.
 - Prune uses `os.remove` and `os.rmdir` only, never a recursive delete, so a directory holding both deploy's file and a package's runtime file survives by construction.
-- A file that predates the manifest is reported as unmanaged and removed only by `just deploy-adopt`.
+- A path that predates the manifest is reported as unmanaged at any depth under the destination, and `just deploy-adopt` removes it only when its parent is the destination root or a directory deploy landed. The two halves differ on purpose. `RUNTIME_OWNED_DIRS` is a fixed list of names, so a directory outside it is not proven safe to empty, and a recursive adopt would delete the state a package writes under a name that list does not carry. The report line says which of the two cases it is.
+- The unmanaged scan covers the destination only. `landing_roots` returns the destination and `~/.pi`, and a leftover under the second one stays unreported.
 - Install-tree convergence runs `pi remove` last, and treats exit 1 with `No matching package found` as success once the dependency is verified gone.
 - Supersedes the repo-root-layout entry above: the payload lives under `home/`, a literal `$HOME` mirror, and the root is machinery only. A payload's repo path states its own destination, so deploy is still a copy or a symlink of that path. This also ends the `AGENTS.md` double injection structurally, because a cwd lookup at the clone root now finds the clone's own rules and never the payload. `AGENTS.override.md` is deleted.
 - A sidecar `path` in `docs/plugins/<name>/sidecars.json` is relative to `$HOME` and is tracked at `home/<path>`. The `root` key is gone: a path under `.pi/agent/` follows `PI_CODING_AGENT_DIR`, and anything else lands under `$HOME`.

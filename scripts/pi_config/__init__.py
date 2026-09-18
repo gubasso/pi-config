@@ -7,13 +7,13 @@ declaring. Most of it is about the second half being safe.
 Modules import downward only, and tests/meta/test_architecture.py is what
 says so:
 
-    paths  fsx  gitx          nothing in-package
-    pins  manifest            the row above
-    sidecars  prune  status   the two rows above
-    landing  trees            the three rows above
-    doctor                    the four rows above
-    deploy  check             the five rows above
-    __main__                  the command line
+    paths  fsx  gitx              nothing in-package
+    pins  manifest                the row above
+    sidecars  prune  status       the two rows above
+    converge  landing  trees      the three rows above
+    doctor                        the four rows above
+    deploy  check                 the five rows above
+    __main__                      the command line
 
 Every name below is re-exported so a caller can say `pi_config.converge`
 without knowing which module grew it. The module is still where the reading
@@ -28,6 +28,10 @@ from .check import (
     check,
     prove_no_tracked_secrets,
     tracked_files,
+)
+from .converge import (
+    converge,
+    report_unmanaged,
 )
 from .deploy import (
     LINKED_FILES,
@@ -122,12 +126,14 @@ from .prune import (
     PRUNE_VETO_NAMES,
     RUNTIME_OWNED_DIRS,
     RUNTIME_OWNED_NAMES,
+    UNMANAGED_REPORT_LIMIT,
+    adopt_boundary,
     classify_stale,
-    converge,
     live_only_dests,
     prune_mode,
     runtime_owned,
     unmanaged_paths,
+    within_adopt_boundary,
 )
 from .sidecars import (
     SIDECAR_CLASSES,
@@ -169,6 +175,8 @@ __all__ = [
     "RUNTIME_OWNED_NAMES",
     "SIDECAR_CLASSES",
     "SIDECAR_KEYS",
+    "UNMANAGED_REPORT_LIMIT",
+    "adopt_boundary",
     "agent_payload_dir",
     "check",
     "classify",
@@ -236,6 +244,7 @@ __all__ = [
     "refuse_store_symlink",
     "relpath_ok",
     "replace_with_hardlink",
+    "report_unmanaged",
     "reset_landed",
     "runtime_owned",
     "same_inode",
@@ -246,6 +255,7 @@ __all__ = [
     "store_owned",
     "tracked_files",
     "unmanaged_paths",
+    "within_adopt_boundary",
     "within_root",
     "write_bytes",
     "write_manifest",

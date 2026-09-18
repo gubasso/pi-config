@@ -100,6 +100,39 @@ declare_extra_prompt() {
   assert_file_not_exist "$PI_CODING_AGENT_DIR/prompts/leftover.md"
 }
 
+# A directory no deploy ever created, holding a file no deploy ever landed.
+# This is what the retired Home Manager writer leaves behind on a migrated
+# host, and what the scan was blind to before it descended.
+seed_stray_directory() {
+  mkdir -p "$PI_CODING_AGENT_DIR/themes/dark"
+  echo '{}' >"$PI_CODING_AGENT_DIR/themes/dark/left-over.json"
+}
+
+@test "deploy-report names a leftover inside a directory deploy never landed" {
+  run pi_just deploy
+  assert_success
+  seed_stray_directory
+
+  run pi_just deploy-report
+  assert_success
+  assert_output --partial "themes/dark/left-over.json"
+  assert_file_exist "$PI_CODING_AGENT_DIR/themes/dark/left-over.json"
+}
+
+@test "deploy-adopt keeps a leftover it cannot prove is safe to remove" {
+  run pi_just deploy
+  assert_success
+  seed_stray_directory
+
+  # The report reaches every depth. Adopt stops at the dest root and the
+  # directories deploy landed, because RUNTIME_OWNED_DIRS is a fixed list of
+  # names and a directory outside it is not proven safe to empty.
+  run pi_just deploy-adopt
+  assert_success
+  assert_file_exist "$PI_CODING_AGENT_DIR/themes/dark/left-over.json"
+  assert_output --partial "remove it by hand"
+}
+
 @test "a manifest naming auth.json fails the run and keeps the credential" {
   run pi_just deploy
   assert_success

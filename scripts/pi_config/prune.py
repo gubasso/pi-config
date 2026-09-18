@@ -1,17 +1,20 @@
-"""Removing what the repo stopped declaring, and refusing everything else.
+"""What may be removed from the destination, and what may not.
 
 The manifest is trusted state, not proof. It sits at the destination, so
 anything able to write there could name auth.json for deletion. The veto
-here is what stands behind it."""
+here is what stands behind it.
+
+Two questions live in this module and nowhere else: whether a path is
+runtime-owned, and which paths at the destination no deploy ever landed.
+`converge` is the pass that acts on the answers."""
 
 from __future__ import annotations
 
-import errno
 import os
 
 from .fsx import store_owned
-from .manifest import MANIFEST_NAME, read_manifest, read_run_manifest, write_manifest
-from .paths import entry_path, landing_roots, sidecar_dest_path, within_root
+from .manifest import MANIFEST_NAME
+from .paths import entry_path, sidecar_dest_path, within_root
 
 # Names Pi and its packages write into the live agent dir. Deploy never
 # creates any of them, so none can enter the manifest and prune cannot reach
@@ -60,6 +63,15 @@ RUNTIME_OWNED_DIRS = {
 PRUNE_VETO_NAMES = RUNTIME_OWNED_NAMES - {"keybindings.json"}
 
 
+# The scan is complete and the report is bounded. A stray tree can hold
+# thousands of files, and a deploy that prints one line for each of them is
+# unreadable, so converge prints this many unmanaged lines and then a tally of
+# the rest. Truncating the scan itself was the other option and it is worse: a
+# depth limit makes the report silently incomplete, and nothing on the line
+# tells the reader that anything was left out.
+UNMANAGED_REPORT_LIMIT = 50
+
+
 def runtime_owned(target: str, roots: list[str]) -> bool:
     """True when a path names something Pi or one of its packages writes.
 
@@ -97,36 +109,96 @@ def prune_mode() -> str:
     return mode
 
 
+def _quiet_name(name: str) -> bool:
+    """A name the scan never reports, at any depth."""
+    return name in RUNTIME_OWNED_NAMES or name == MANIFEST_NAME or name.endswith(".log")
+
+
+def _bare_dirs(candidates: list[str], files: list[str]) -> list[str]:
+    """Stray directories that hold no reported file.
+
+    A stray directory holding files is named by its files, so naming it too
+    would print the same leftover twice. An empty one has no file to name it,
+    and it is still a leftover a reader wants told about. The shallowest one
+    wins, because a reader removes the outer directory and the rest go with it.
+    """
+    out: list[str] = []
+    for path in sorted(candidates, key=lambda p: (p.count(os.sep), p)):
+        if any(path.startswith(seen + os.sep) for seen in out):
+            continue
+        if any(entry.startswith(path + os.sep) for entry in files):
+            continue
+        out.append(path)
+    return out
+
+
 def unmanaged_paths(
     dest: str, landed: list[tuple[str, str]], protected: set[str]
 ) -> list[str]:
-    """Files at the dest that deploy did not land and Pi does not own.
+    """Paths under the dest that deploy did not land and Pi does not own.
 
     These predate the manifest, so prune cannot see them. They are reported,
-    and removed only by an explicit PI_CONFIG_PRUNE=adopt run.
+    and removed only by an explicit PI_CONFIG_PRUNE=adopt run, and then only
+    inside `adopt_boundary`.
+
+    The walk has no depth limit and no file-count limit. It descends the whole
+    destination, because a leftover from a writer this repository does not
+    control can sit at any depth: the migration off Home Manager is exactly
+    that case. Output is bounded where the printing happens, not here, so the
+    answer this returns is always the whole answer.
     """
     dest_abs = os.path.abspath(dest)
     known = {os.path.realpath(path) for path, _ in landed} | protected
-    managed_dirs = [path for path, how in landed if how == "dir"]
-    roots = [dest_abs] + managed_dirs
-    out = []
-    for root in roots:
-        if not os.path.isdir(root):
-            continue
-        for name in sorted(os.listdir(root)):
+    files: list[str] = []
+    strays: list[str] = []
+    for root, dirs, names in os.walk(dest_abs, followlinks=False):
+        keep = []
+        for name in dirs:
             target = os.path.join(root, name)
-            if name in RUNTIME_OWNED_NAMES or name == MANIFEST_NAME:
+            # Pruned from the walk rather than filtered afterwards, so a
+            # session tree costs nothing to skip.
+            if name in RUNTIME_OWNED_DIRS:
                 continue
-            if name.endswith(".log"):
+            if os.path.islink(target):
+                # One entry, never a tree. os.walk does not follow it either,
+                # so the two agree about where the destination stops.
+                if not _quiet_name(name) and os.path.realpath(target) not in known:
+                    files.append(target)
                 continue
-            if name in RUNTIME_OWNED_DIRS and os.path.isdir(target):
-                continue
-            if os.path.isdir(target) and not os.path.islink(target):
+            keep.append(name)
+            if os.path.realpath(target) not in known:
+                strays.append(target)
+        dirs[:] = keep
+        for name in names:
+            target = os.path.join(root, name)
+            if _quiet_name(name):
                 continue
             if os.path.realpath(target) in known:
                 continue
-            out.append(target)
-    return sorted(set(out))
+            files.append(target)
+    return sorted(set(files) | set(_bare_dirs(strays, files)))
+
+
+def adopt_boundary(dest: str, landed: list[tuple[str, str]]) -> set[str]:
+    """The directories `just deploy-adopt` may delete a file out of.
+
+    The destination root, plus every directory this run landed. Nothing else.
+
+    The scan reports at any depth and adopt does not follow it that far, and
+    the reason is RUNTIME_OWNED_DIRS. That list is a fixed set of names, so a
+    directory outside it is not proven safe to empty: the day Pi or one of its
+    packages writes state under a name the list does not carry, a recursive
+    adopt would delete that state on the next deploy. Reporting a path costs
+    an operator one line. Deleting it costs them the file.
+    """
+    out = {os.path.realpath(dest)}
+    out.update(os.path.realpath(path) for path, how in landed if how == "dir")
+    return out
+
+
+def within_adopt_boundary(target: str, boundary: set[str]) -> bool:
+    """True when adopt may delete this path."""
+    return os.path.realpath(os.path.dirname(os.path.abspath(target))) in boundary
 
 
 def live_only_dests(dest: str, sidecars: list[dict[str, object]]) -> set[str]:
@@ -170,81 +242,3 @@ def classify_stale(
     if how != "dir" and os.path.isdir(target) and not os.path.islink(target):
         return "refused"
     return "prune"
-
-
-def converge(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
-    """Land the recorded set, then remove what the repo no longer declares."""
-    mode = prune_mode()
-    landed = read_run_manifest()
-    old = read_manifest(dest)
-    roots = landing_roots(dest)
-    keep = {os.path.realpath(path) for path, _ in landed}
-    protected = live_only_dests(dest, sidecars)
-
-    stale = [row for row in old if os.path.realpath(row["path"]) not in keep]
-    verdicts = [
-        (
-            row["path"],
-            row["how"],
-            classify_stale(src, roots, row["path"], row["how"], protected),
-        )
-        for row in stale
-    ]
-
-    pruned = 0
-    print(f"pi-config: converging files ({len(landed)} declared, {len(stale)} stale)")
-    for target, how, verdict in verdicts:
-        if verdict == "keep":
-            continue
-        if verdict == "gone":
-            print(f"  gone    {how:<8} {target}")
-            continue
-        if verdict == "refused":
-            print(f"  refused {how:<8} {target} (now a directory)")
-            continue
-        if mode == "report":
-            print(f"  would-prune {how:<8} {target}")
-            continue
-        print(f"  prune   {how:<8} {target}")
-
-    if mode in ("apply", "adopt"):
-        for target, how, verdict in verdicts:
-            if verdict != "prune" or how == "dir":
-                continue
-            os.remove(target)
-            pruned += 1
-        # Deepest first, so a nested pair empties before its parent.
-        dirs = sorted(
-            (t for t, how, v in verdicts if v == "prune" and how == "dir"),
-            key=lambda p: p.count(os.sep),
-            reverse=True,
-        )
-        for target in dirs:
-            try:
-                os.rmdir(target)
-                pruned += 1
-            except OSError as exc:
-                if exc.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOTDIR):
-                    raise
-                print(f"  kept    not-empty {target}")
-
-    # Files that predate the manifest. Prune cannot see them, so they are
-    # reported every run and removed only by an explicit adopt.
-    unmanaged = unmanaged_paths(dest, landed, protected)
-    for target in unmanaged:
-        if mode == "adopt":
-            verdict = classify_stale(src, roots, target, "copy", protected)
-            if verdict != "prune":
-                print(f"  {verdict:<7} unmanaged {target}")
-                continue
-            os.remove(target)
-            pruned += 1
-            print(f"  adopted copy     {target}")
-        else:
-            print(f"  unmanaged        {target} (just deploy-adopt removes it)")
-
-    if mode == "report":
-        print("pi-config: report only; manifest not written")
-        return
-    write_manifest(src, dest, landed)
-    print(f"pi-config: files converged ({len(landed)} declared, {pruned} removed)")

@@ -25,12 +25,12 @@ from __future__ import annotations
 
 import os
 
+from .converge import converge
 from .doctor import preflight
 from .fsx import copy_regular, store_owned
 from .landing import land_sidecars
 from .manifest import record, reset_landed
 from .paths import agent_payload_dir, landing_roots
-from .prune import converge
 
 # Copied wholesale when the directory exists. Stock Pi names, so landing is a
 # copy of the path rather than a mapping anybody has to remember.
