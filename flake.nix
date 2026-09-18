@@ -45,7 +45,12 @@
               # scripts/pi_config/, the doctor's JSON probes, and the
               # Python half of the test suite. pytest rides along with the
               # interpreter so no test runner reaches PATH from outside Nix.
-              (python3.withPackages (ps: [ ps.pytest ]))
+              (python3.withPackages (ps: [
+                ps.pytest
+                # tests/meta reads .pre-commit-config.yaml to prove the
+                # formatter and the whitespace fixers skip the same files.
+                ps.pyyaml
+              ]))
               # markdownlint-cli2 runs on this node through
               # `language_version: system`. pre-commit's own nodeenv
               # downloads a generic-glibc node whose ELF interpreter
