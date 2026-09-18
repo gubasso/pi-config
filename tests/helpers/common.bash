@@ -55,6 +55,16 @@ pi_guard_dest() {
 # creates it, and `just doctor` has a documented source-only path that
 # depends on it being absent.
 pi_setup() {
+  # Detach from the repository git may have handed us.
+  #
+  # A pre-push hook runs inside `git push`, and a pre-commit hook inside
+  # `git commit`. Both export GIT_INDEX_FILE and GIT_DIR pointing at the real
+  # repository. A test that then runs `git add` in its sandbox writes through
+  # to the real index, replacing the operator's staged state with the
+  # sandbox's. Nothing reports it, and the damage is outside the test.
+  unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_PREFIX
+  unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+
   export HOME="$BATS_TEST_TMPDIR/home"
   export PI_CODING_AGENT_DIR="$HOME/.pi/agent"
   mkdir -p "$HOME"

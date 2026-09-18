@@ -154,6 +154,25 @@ repos:
         language: system
         files: '(\.(sh|bash)$|^tests/helpers/stubs/)'
 
+      # --- Types ---
+      #
+      # Both read a config file this repository now carries, and a config
+      # nothing reads is drift waiting to happen. Neither passes filenames:
+      # a type error is a property of the program, not of one file, and
+      # checking a subset reports errors that a whole-project run does not.
+      - id: pyright
+        name: pyright
+        entry: pyright
+        language: system
+        files: '\.py$'
+        pass_filenames: false
+      - id: tsc
+        name: tsc --noEmit
+        entry: tsc --noEmit
+        language: system
+        files: '\.ts$'
+        pass_filenames: false
+
       # --- Tests ---
       #
       # This pair is the source of truth for when the suite runs. The cost

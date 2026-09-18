@@ -1,4 +1,5 @@
-# One script lives under scripts/. Keep the rule set small enough to read.
+# The engine lives under scripts/ and its tests under tests/. Keep the rule
+# set small enough to read.
 line-length = 88
 
 [lint]
@@ -13,3 +14,8 @@ select = [
 # `ruff format` owns line length. It cannot split a long message string, so
 # E501 only ever fires on a literal the formatter deliberately left alone.
 ignore = ["E501"]
+
+# `pi_config` is this repository's own module, so import sorting must not
+# group it with the standard library or with a dependency.
+[lint.isort]
+known-first-party = ["pi_config"]

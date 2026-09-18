@@ -1,26 +1,56 @@
 #!/usr/bin/env bash
-# A `pi` that records instead of acting.
+# A `pi` that records instead of reaching the network.
 #
 # `just deploy` ends by converging install trees through `pi remove`, and
 # `just status` reports whether `pi` is on PATH at all. Neither belongs in a
-# test: the real command mutates the operator's package trees, and it needs a
+# test: the real command mutates the operator's package trees and needs a
 # network. This stub answers both and writes every call to $PI_STUB_LOG so a
 # test can assert what deploy asked for.
 #
-# PI_STUB_PI_REMOVE_MISSING makes `pi remove` answer the way the real command
-# answers for a package that is already gone: exit 1, with the sentence the
-# converge path treats as success.
+# `remove` drops the dependency from the npm project, because that is what the
+# real command does and the engine re-reads that file afterwards. A stub that
+# only exited zero would trip the "left the dependency in place" guard.
+#
+# Two knobs let a test reach the paths that matter:
+#
+#   PI_STUB_PI_REMOVE_MISSING  exit 1 with the sentence the real command
+#                              prints for a package that is already gone,
+#                              which converge treats as success
+#   PI_STUB_PI_REMOVE_KEEPS    exit 0 but leave the dependency behind, so
+#                              the guard against a half-done removal fires
 
 set -euo pipefail
 
 printf '%s\n' "$*" >>"${PI_STUB_LOG:-/dev/null}"
 
+drop_npm_dependency() {
+  local source="$1"
+  local manifest="${PI_CODING_AGENT_DIR:-}/npm/package.json"
+
+  [ -n "${PI_CODING_AGENT_DIR:-}" ] || return 0
+  [ -f "$manifest" ] || return 0
+  [ -z "${PI_STUB_PI_REMOVE_KEEPS:-}" ] || return 0
+
+  python3 - "$manifest" "${source#npm:}" <<'PY'
+import json, sys
+
+path, name = sys.argv[1], sys.argv[2]
+with open(path) as handle:
+    doc = json.load(handle)
+doc.get("dependencies", {}).pop(name, None)
+with open(path, "w") as handle:
+    json.dump(doc, handle)
+PY
+}
+
 case "${1:-}" in
 remove)
   if [ -n "${PI_STUB_PI_REMOVE_MISSING:-}" ]; then
+    drop_npm_dependency "${2:-}"
     echo "No matching package found" >&2
     exit 1
   fi
+  drop_npm_dependency "${2:-}"
   exit 0
   ;;
 --version)
