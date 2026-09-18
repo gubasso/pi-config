@@ -140,7 +140,13 @@ def load_pins(src: str, dest: str) -> list[dict[str, str]]:
     return pins
 
 
-def prove_docs(src: str, pins: list[dict[str, str]]) -> None:
+def prove_docs(src: str, pins: list[dict[str, str]], quiet: bool = False) -> None:
+    """Every pin has its docs, and every docs directory has its pin.
+
+    `quiet` proves without narrating. Deploy's preflight runs this before it
+    writes, and doctor runs it again after, so the second run is the one the
+    operator reads.
+    """
     root = plugins_root(src)
     names = {row["name"]: row["pin"] for row in pins}
     for row in pins:
@@ -149,7 +155,8 @@ def prove_docs(src: str, pins: list[dict[str, str]]) -> None:
             path = os.path.join(docs, name)
             if not os.path.isfile(path):
                 raise SystemExit(f"missing {path} for {row['pin']}")
-        print(f"ok  plugin docs {row['name']}")
+        if not quiet:
+            print(f"ok  plugin docs {row['name']}")
     if os.path.isdir(root):
         for entry in sorted(os.listdir(root)):
             path = os.path.join(root, entry)
@@ -157,12 +164,19 @@ def prove_docs(src: str, pins: list[dict[str, str]]) -> None:
                 continue
             if entry not in names:
                 raise SystemExit(f"docs/plugins/{entry} has no matching packages pin")
-    print("ok  plugin docs pairing")
-    note_frozen(pins)
+    if not quiet:
+        print("ok  plugin docs pairing")
+    note_frozen(pins, quiet=quiet)
 
 
-def note_frozen(pins: list[dict[str, str]]) -> None:
-    """Report pins that carry a version or ref. A freeze is allowed, with a reason."""
+def note_frozen(pins: list[dict[str, str]], quiet: bool = False) -> None:
+    """Report pins that carry a version or ref. A freeze is allowed, with a reason.
+
+    A frozen pin is a note rather than a failure, so `quiet` silences it too.
+    Doctor repeats the note after the landing.
+    """
+    if quiet:
+        return
     frozen = [row for row in pins if row["frozen"]]
     for row in frozen:
         print(

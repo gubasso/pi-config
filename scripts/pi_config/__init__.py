@@ -11,8 +11,8 @@ says so:
     pins  manifest            the row above
     sidecars  prune  status   the two rows above
     landing  trees            the three rows above
-    deploy  doctor            the four rows above
-    check                     the five rows above
+    doctor                    the four rows above
+    deploy  check             the five rows above
     __main__                  the command line
 
 Every name below is re-exported so a caller can say `pi_config.converge`

@@ -604,8 +604,8 @@ scripts/
     ├── status.py                # what the operator sees
     ├── landing.py               # putting a classified sidecar in place
     ├── trees.py                 # install-tree convergence via `pi remove`
-    ├── deploy.py                # the landing orchestration
     ├── doctor.py                # the proofs
+    ├── deploy.py                # the landing orchestration
     └── check.py                 # the source-tree contract
 ```
 
@@ -619,8 +619,8 @@ Modules import downward only. A module may import from a strictly lower layer an
 | 1     | `pins`, `manifest`            |
 | 2     | `sidecars`, `prune`, `status` |
 | 3     | `landing`, `trees`            |
-| 4     | `deploy`, `doctor`            |
-| 5     | `check`                       |
+| 4     | `doctor`                      |
+| 5     | `deploy`, `check`             |
 | 6     | `__main__`                    |
 
 One behavior has one implementation. `store_owned` lived three times across two languages before this, which meant three chances to get the Home Manager refusal wrong.

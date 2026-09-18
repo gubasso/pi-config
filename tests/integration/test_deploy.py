@@ -262,6 +262,37 @@ class TestDeployPreflight:
 
         assert sorted(p.name for p in inside.iterdir()) == before
 
+    def test_the_guard_does_not_depend_on_the_variable_being_set(
+        self, clone: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The dangerous case is the one where nobody set the variable.
+
+        The justfile expands `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` in the
+        shell and never exports it. A clone sitting at that default therefore
+        reached the guard with the variable unset, and an earlier guard that
+        read the environment let it straight through.
+        """
+        monkeypatch.delenv("PI_CODING_AGENT_DIR", raising=False)
+        inside = clone / "home" / ".pi" / "agent"
+        before = sorted(p.name for p in inside.iterdir())
+
+        with pytest.raises(SystemExit, match="inside this clone"):
+            pi_config.deploy(str(clone), str(inside), [], [])
+
+        assert sorted(p.name for p in inside.iterdir()) == before
+
+    def test_the_clone_root_is_refused_as_a_destination(
+        self, clone: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Landing onto the clone root would overwrite its own AGENTS.md."""
+        monkeypatch.delenv("PI_CODING_AGENT_DIR", raising=False)
+        rules = (clone / "AGENTS.md").read_text()
+
+        with pytest.raises(SystemExit, match="inside this clone"):
+            pi_config.deploy(str(clone), str(clone), [], [])
+
+        assert (clone / "AGENTS.md").read_text() == rules
+
     def test_a_symlinked_payload_destination_does_not_truncate_its_target(
         self, clone: pathlib.Path, dest: pathlib.Path, tmp_home: pathlib.Path
     ) -> None:

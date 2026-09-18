@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 
 import pytest
 
@@ -65,6 +66,31 @@ def local_imports(path: pathlib.Path) -> set[str]:
 def test_every_module_has_a_declared_layer(repo_root: pathlib.Path) -> None:
     """A new module must be placed, not left to find its own level."""
     assert set(modules(repo_root)) == set(LAYERS)
+
+
+def spec_layers(repo_root: pathlib.Path) -> dict[str, int]:
+    """The layer map as SPEC.md §15 writes it, read out of its table."""
+    spec = (repo_root / "SPEC.md").read_text()
+    rows = re.findall(r"^\|\s*(\d+)\s*\|([^|]*)\|\s*$", spec, re.MULTILINE)
+    assert rows, "SPEC.md no longer carries a layer table"
+    found: dict[str, int] = {}
+    for layer, names in rows:
+        for name in re.findall(r"`([^`]+)`", names):
+            found[name] = int(layer)
+    return found
+
+
+def test_the_spec_layer_table_matches_the_enforced_map(
+    repo_root: pathlib.Path,
+) -> None:
+    """Two declarations of one rule, kept in step.
+
+    SPEC.md tells the next reader which imports are legal, and this file is
+    what actually refuses them. When `deploy` grew an import of `doctor` the
+    two disagreed, and nothing said so: the specification still forbade the
+    import the suite had just been taught to allow.
+    """
+    assert spec_layers(repo_root) == LAYERS
 
 
 def test_no_module_imports_its_own_layer_or_higher(

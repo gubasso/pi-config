@@ -130,8 +130,8 @@ def prove_source(
         fail("settings.json is not JSON")
     say("settings.json json")
 
-    prove_docs(src, pins)
-    prove_sidecars_source(src, sidecars)
+    prove_docs(src, pins, quiet=quiet)
+    prove_sidecars_source(src, sidecars, quiet=quiet)
 
     if store_owned(os.path.join(agent_src, "AGENTS.md")):
         fail("source payload AGENTS.md is a store symlink")
@@ -157,14 +157,19 @@ def preflight(
 
 
 def prove_dest_location(src: str, dest: str) -> None:
-    """The live directory is never this clone. Deploy would land onto source."""
-    if not os.environ.get("PI_CODING_AGENT_DIR"):
-        return
+    """The live directory is never this clone. Deploy would land onto source.
+
+    Judged on the destination itself, never on how the destination was
+    chosen. The justfile expands `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`
+    without exporting it, so a clone sitting at that default arrived here
+    with the variable unset, walked past the guard, and had its own root
+    AGENTS.md replaced by the payload one.
+    """
     clone = os.path.realpath(src)
     resolved = os.path.realpath(dest)
     if resolved == clone or resolved.startswith(clone + os.sep):
         fail(
-            f"PI_CODING_AGENT_DIR points inside this clone ({resolved}); "
+            f"the destination is inside this clone ({resolved}); "
             "the clone is source, not the live dir"
         )
 

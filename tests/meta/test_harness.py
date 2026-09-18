@@ -135,6 +135,30 @@ def test_the_bats_helper_detaches_from_git_before_anything_runs(
     assert unset < first_use
 
 
+def test_the_justfile_keeps_the_devshell_on_the_python_path(
+    repo_root: pathlib.Path,
+) -> None:
+    """The justfile adds `scripts/` to PYTHONPATH. It must not replace it.
+
+    The devshell puts every Nix Python package on PYTHONPATH, so a bare
+    assignment made `import yaml` fail inside `just test` while a bare
+    `pytest` in the same shell passed. The gate is the only path that runs
+    under `just`, which is exactly where the breakage hid.
+    """
+    env = {**os.environ, "PYTHONPATH": "/sentinel/inherited"}
+    got = subprocess.run(
+        ["just", "--evaluate", "PYTHONPATH"],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+    assert got.split(":")[0] == str(repo_root / "scripts")
+    assert "/sentinel/inherited" in got.split(":")
+
+
 def test_the_payload_guard_notices_a_mutation_that_adds_no_path(
     repo_root: pathlib.Path,
 ) -> None:

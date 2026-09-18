@@ -51,6 +51,28 @@ class TestProveSource:
     def test_passes_a_complete_tree(self, clone: pathlib.Path) -> None:
         pi_config.prove_source(str(clone), [], [])
 
+    def test_quiet_says_nothing_at_all(
+        self, clone: pathlib.Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Deploy proves the clone, then doctor proves it again.
+
+        Quiet has to reach every proof `prove_source` delegates to, not only
+        the ones it prints itself. A partial quiet still doubles the plugin
+        and sidecar lines, which is the noise the flag exists to remove.
+        """
+        pi_config.prove_source(str(clone), [], [], quiet=True)
+
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == ""
+
+    def test_it_narrates_when_it_is_not_quiet(
+        self, clone: pathlib.Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pi_config.prove_source(str(clone), [], [])
+
+        assert "ok  " in capsys.readouterr().out
+
     @pytest.mark.parametrize("name", ["SPEC.md", "justfile", "flake.nix"])
     def test_fails_on_a_missing_meta_file(self, clone: pathlib.Path, name: str) -> None:
         (clone / name).unlink()
@@ -126,6 +148,30 @@ class TestProveDestLocation:
 
         with pytest.raises(SystemExit, match="inside this clone"):
             pi_config.prove_dest_location(str(clone), str(inside))
+
+    def test_refuses_it_with_the_variable_unset(
+        self, clone: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The guard reads the destination, never the environment.
+
+        `just deploy` expands `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` in the
+        shell without exporting it, so the default path arrives here with the
+        variable unset. A guard keyed on the variable skipped exactly the
+        configuration SPEC.md §5 forbids.
+        """
+        monkeypatch.delenv("PI_CODING_AGENT_DIR", raising=False)
+        inside = clone / "home" / ".pi" / "agent"
+
+        with pytest.raises(SystemExit, match="inside this clone"):
+            pi_config.prove_dest_location(str(clone), str(inside))
+
+    def test_refuses_the_clone_root_itself(
+        self, clone: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("PI_CODING_AGENT_DIR", raising=False)
+
+        with pytest.raises(SystemExit, match="inside this clone"):
+            pi_config.prove_dest_location(str(clone), str(clone))
 
     def test_allows_a_destination_elsewhere(
         self, clone: pathlib.Path, dest: pathlib.Path

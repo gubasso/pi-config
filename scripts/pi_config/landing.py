@@ -63,7 +63,15 @@ def land_atomic_sot(
     )
 
 
-def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
+def prove_sidecars_source(
+    src: str, sidecars: list[dict[str, object]], quiet: bool = False
+) -> None:
+    """Prove every declared sidecar against its class. `quiet` does not narrate.
+
+    Deploy's preflight runs this before it writes, and doctor runs it again
+    after, so only the second run speaks.
+    """
+    say = (lambda _message: None) if quiet else print
     for row in sidecars:
         rel = str(row["path"])
         klass = str(row["class"])
@@ -76,7 +84,7 @@ def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
                 raise SystemExit(f"live-only sidecar is tracked: {rel}")
             if not git_ignored(src, repo_rel):
                 raise SystemExit(f"live-only sidecar is not gitignored: {rel}")
-            print(f"ok  sidecar live-only {rel}")
+            say(f"ok  sidecar live-only {rel}")
             continue
         if git_ignored(src, repo_rel):
             raise SystemExit(f"{klass} sidecar is gitignored: {rel}")
@@ -93,9 +101,9 @@ def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
                     f"{klass} sidecar {rel} exists but is untracked; git add it"
                 )
             prove_json_sidecar(source_path, rel)
-            print(f"ok  sidecar source {klass} {rel}")
+            say(f"ok  sidecar source {klass} {rel}")
         else:
-            print(f"ok  sidecar optional-absent {klass} {rel}")
+            say(f"ok  sidecar optional-absent {klass} {rel}")
 
 
 def prove_sidecars_landing(
