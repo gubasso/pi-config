@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# A `pi` that records instead of acting.
+#
+# `just deploy` ends by converging install trees through `pi remove`, and
+# `just status` reports whether `pi` is on PATH at all. Neither belongs in a
+# test: the real command mutates the operator's package trees, and it needs a
+# network. This stub answers both and writes every call to $PI_STUB_LOG so a
+# test can assert what deploy asked for.
+#
+# PI_STUB_PI_REMOVE_MISSING makes `pi remove` answer the way the real command
+# answers for a package that is already gone: exit 1, with the sentence the
+# converge path treats as success.
+
+set -euo pipefail
+
+printf '%s\n' "$*" >>"${PI_STUB_LOG:-/dev/null}"
+
+case "${1:-}" in
+remove)
+  if [ -n "${PI_STUB_PI_REMOVE_MISSING:-}" ]; then
+    echo "No matching package found" >&2
+    exit 1
+  fi
+  exit 0
+  ;;
+--version)
+  echo "${PI_STUB_VERSION:-0.85.1}"
+  exit 0
+  ;;
+*)
+  exit 0
+  ;;
+esac

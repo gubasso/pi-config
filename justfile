@@ -18,6 +18,22 @@ hooks:
 lint:
     pre-commit run --all-files
 
+# Run the tests a commit must pass
+#
+# The hook is the source of truth for when the suite runs, so these recipes
+# call pre-commit rather than the runner. To drive one slice while you are
+# writing it, call the runner directly: `scripts/run-tests.sh fast unit`, or
+# `pytest tests/unit -k veto`. That is debugging, and it is not the gate.
+test:
+    pre-commit run --all-files pi-config-test-fast
+
+# Run the tests a push must pass
+test-slow:
+    pre-commit run --all-files --hook-stage pre-push pi-config-test-slow
+
+# Run every test, at both budgets
+test-all: test test-slow
+
 # Prove the devShell supplies every tool a recipe, a hook, or an LSP this tree uses
 devshell-check:
     #!/usr/bin/env bash

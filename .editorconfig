@@ -23,8 +23,14 @@ indent_style = space
 indent_size = 2
 
 # scripts/run-tests.sh, tests/helpers/*.bash, and tests/e2e/*.bats. shfmt
-# formats them; this block is what shfmt -i 2 and the checker agree on.
+# reads this block, so it is what sets the shell indent.
 [*.{sh,bash,bats}]
+indent_style = space
+indent_size = 2
+
+# A stub under tests/helpers/stubs/ stands in for a command on PATH, so it
+# carries no extension and the block above cannot match it.
+[tests/helpers/stubs/*]
 indent_style = space
 indent_size = 2
 

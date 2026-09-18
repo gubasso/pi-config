@@ -14,7 +14,11 @@
 #                         not touch.
 #   markdownlint-cli2   : style gate beyond dprint, plus the one autofix
 #                         dprint cannot do (MD029 renumbering).
-#   ruff                : scripts/package-pins.py.
+#   ruff                : the Python under scripts/ and tests/.
+#   shellcheck, shfmt   : the shell under scripts/ and tests/helpers/.
+#                         Not *.bats: `@test "x" {` is not bash.
+#   run-tests.sh        : the suite. The cost tag on a test picks the
+#                         stage, so `fast` lands here and `slow` at push.
 #   nixfmt/statix/deadnix: flake.nix.
 #   typos, ripsecrets   : spelling and staged-diff secrets.
 #   gitleaks            : full-history secret scan, at push time.
@@ -125,6 +129,52 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-commit, pre-push]
+
+      # --- Shell ---
+      #
+      # scripts/ and tests/helpers/ are the only shell this tree authors.
+      # shfmt takes its indent from .editorconfig, and -d reports instead of
+      # rewriting, so the file a later hook reads is the file that was
+      # staged.
+      #
+      # Neither tool sees *.bats. A bats file opens its tests with
+      # `@test "name" {`, which is not bash and does not parse. bats itself
+      # is the gate for those, through scripts/run-tests.sh.
+      #
+      # The stub `pi` carries no extension, because it stands in for a
+      # command on PATH, so it is matched by path.
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: system
+        files: '(\.(sh|bash)$|^tests/helpers/stubs/)'
+      - id: shfmt
+        name: shfmt
+        entry: shfmt -d
+        language: system
+        files: '(\.(sh|bash)$|^tests/helpers/stubs/)'
+
+      # --- Tests ---
+      #
+      # This pair is the source of truth for when the suite runs. The cost
+      # tag on a test decides which one picks it up, and the budget in the
+      # header decides what each stage may cost. `just test` calls these,
+      # never the other way round.
+      - id: pi-config-test-fast
+        name: tests (fast)
+        entry: scripts/run-tests.sh fast
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: pi-config-test-slow
+        name: tests (slow)
+        entry: scripts/run-tests.sh slow
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
 
   # --- Markdown style gate ---
   #
