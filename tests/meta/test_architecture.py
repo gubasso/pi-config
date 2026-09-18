@@ -30,7 +30,10 @@ LAYERS = {
     "status": 2,
     "landing": 3,
     "trees": 3,
-    "__main__": 4,
+    "deploy": 4,
+    "doctor": 4,
+    "check": 5,
+    "__main__": 6,
 }
 
 # A module past this wants splitting. It is a pressure signal, not a law of

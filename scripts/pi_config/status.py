@@ -3,14 +3,44 @@
 from __future__ import annotations
 
 import os
+import shutil
 
 from .fsx import same_inode
 from .paths import plugin_docs_dir, sidecar_dest_path, sidecar_source_path
 
 
+def describe(path: str, label: str) -> None:
+    if os.path.islink(path):
+        target = os.path.realpath(path)
+        kind = "store-symlink" if "/nix/store/" in target else f"symlink {target}"
+    elif os.path.exists(path):
+        kind = "file"
+    else:
+        kind = "no"
+    print(f"{label} {kind}")
+
+
+def print_header(src: str, dest: str) -> None:
+    """Where this run would read from and write to, before any detail."""
+    print(f"source {src}")
+    print(f"dest {dest}")
+    override = os.environ.get("PI_CODING_AGENT_DIR")
+    print(
+        f"PI_CODING_AGENT_DIR {override}" if override else "PI_CODING_AGENT_DIR (unset)"
+    )
+
+    describe(os.path.join(dest, "AGENTS.md"), "dest AGENTS.md")
+    describe(os.path.join(dest, "settings.json"), "dest settings.json")
+    describe(os.path.join(dest, "auth.json"), "dest auth.json")
+
+    found = shutil.which("pi")
+    print(f"pi {found}" if found else "pi (missing)")
+
+
 def print_status(
     src: str, dest: str, pins: list[dict[str, str]], sidecars: list[dict[str, object]]
 ) -> None:
+    print_header(src, dest)
     if not pins:
         print("packages none")
         return

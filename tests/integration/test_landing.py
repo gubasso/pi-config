@@ -36,21 +36,14 @@ def dest(tmp_home: pathlib.Path) -> pathlib.Path:
 
 
 @pytest.fixture
-def recording(
-    tmp_path: pathlib.Path,
-    tmp_home: pathlib.Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> pathlib.Path:
-    """Landing appends to the run manifest, so give it one to append to.
+def recording(tmp_home: pathlib.Path) -> None:
+    """Start each test with an empty landing record.
 
-    Depends on tmp_home for the ordering, not for the path. tmp_home clears
-    PI_CONFIG_RUN_MANIFEST so no test inherits a real one, and without this
-    dependency it can run second and clear what was just set.
+    Landing notes every path it creates, and the record lives in the process
+    rather than in a file, so a test that does not clear it inherits whatever
+    the previous one landed.
     """
-    run = tmp_path / "run-manifest"
-    run.write_text("")
-    monkeypatch.setenv("PI_CONFIG_RUN_MANIFEST", str(run))
-    return run
+    pi_config.reset_landed()
 
 
 def commit(clone: pathlib.Path, message: str = "x") -> None:
@@ -159,7 +152,7 @@ class TestLandSidecars:
             )
 
     def test_landing_is_recorded_for_the_manifest(
-        self, clone: pathlib.Path, dest: pathlib.Path, recording: pathlib.Path
+        self, clone: pathlib.Path, dest: pathlib.Path
     ) -> None:
         sidecar(clone, ".pi/agent/thing.json", "{}")
 
@@ -167,7 +160,7 @@ class TestLandSidecars:
             str(clone), str(dest), [row(".pi/agent/thing.json", "copy")]
         )
 
-        assert f"copy\t{dest / 'thing.json'}" in recording.read_text()
+        assert (str(dest / "thing.json"), "copy") in pi_config.landed()
 
 
 @pytest.mark.usefixtures("recording")

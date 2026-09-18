@@ -1,86 +1,71 @@
-"""The command line. One mode per verb, dispatched to the module that owns it."""
+"""The command line. One verb per recipe, and nothing internal.
+
+Every verb here is something an operator runs. The old internal verbs, the
+ones the justfile's bash called to hand work back to Python, are gone with
+the bash that called them.
+
+No `if __name__ == "__main__"` guard. A package's __main__ module runs only
+under `python3 -m pi_config`, and the guard once hid a real failure: a
+refactor dropped it, every recipe then loaded the module and exited zero
+without doing anything, and only the end-to-end tests noticed.
+"""
 
 from __future__ import annotations
 
 import json
-import os
 import sys
 
-from .landing import (
-    land_sidecars,
-    prove_sidecars_landing,
-    prove_sidecars_source,
-)
-from .manifest import prove_manifest
-from .paths import landing_roots
-from .pins import load_pins, prove_docs
-from .prune import converge
+from .check import check
+from .deploy import deploy
+from .doctor import doctor
+from .pins import load_pins
 from .sidecars import load_sidecars
 from .status import print_status
-from .trees import converge_trees, note_trees
+from .trees import converge_trees
+
+VERBS = ("deploy", "doctor", "check", "status", "emit")
 
 
 def usage() -> None:
-    raise SystemExit(
-        "usage: python3 -m pi_config "
-        "emit|prove-docs|prove-sidecars|land-sidecars|prove-roots|converge|"
-        "converge-trees|prove-manifest|status|note-trees SRC DEST"
-    )
+    raise SystemExit(f"usage: python3 -m pi_config {'|'.join(VERBS)} SRC DEST")
 
 
 def main() -> None:
     if len(sys.argv) != 4:
         usage()
-    mode, src, dest = sys.argv[1], sys.argv[2], sys.argv[3]
+    verb, src, dest = sys.argv[1], sys.argv[2], sys.argv[3]
+    if verb not in VERBS:
+        usage()
+
     pins = load_pins(src, dest)
-    if mode == "emit":
+
+    if verb == "emit":
         for row in pins:
             json.dump(row, sys.stdout)
             sys.stdout.write("\n")
         return
-    if mode == "prove-docs":
-        prove_docs(src, pins)
-        load_sidecars(src, pins)
+
+    sidecars = load_sidecars(src, pins)
+
+    if verb == "check":
+        check(src, pins, sidecars)
         return
-    sidecars = load_sidecars(src, pins) if mode != "note-trees" else []
-    if mode == "prove-sidecars":
-        prove_docs(src, pins)
-        prove_sidecars_source(src, sidecars)
-        if os.environ.get("DOCTOR_SOURCE_ONLY") == "1":
-            return
-        if not os.path.isdir(dest):
-            print(f"note: dest {dest} does not exist (source-only sidecars)")
-            return
-        prove_sidecars_landing(src, dest, sidecars)
-        return
-    if mode == "land-sidecars":
-        land_sidecars(src, dest, sidecars)
-        return
-    if mode == "prove-roots":
-        for root in landing_roots(dest):
-            print(f"ok  landing root {root}")
-        return
-    if mode == "converge":
-        converge(src, dest, sidecars)
-        return
-    if mode == "prove-manifest":
-        prove_manifest(src, dest)
-        return
-    if mode == "converge-trees":
-        converge_trees(dest, pins)
-        return
-    if mode == "status":
+
+    if verb == "status":
         print_status(src, dest, pins, sidecars)
         return
-    if mode == "note-trees":
-        note_trees(pins)
+
+    if verb == "doctor":
+        doctor(src, dest, pins, sidecars)
         return
-    usage()
+
+    # deploy. Landing, then converging files, then proving, then converging
+    # install trees. Trees go last because `pi remove` runs npm and can need
+    # the network: a failure there leaves the config correct and only an
+    # install tree orphaned.
+    dest = deploy(src, dest, sidecars)
+    doctor(src, dest, pins, sidecars)
+    converge_trees(dest, pins)
 
 
-# No `if __name__ == "__main__"` guard. A package's __main__ module runs only
-# under `python3 -m pi_config`, and the guard hid a real failure once: the
-# split that created this file dropped it, every recipe then loaded the module
-# and exited zero without doing anything, and only the end-to-end tests
-# noticed.
 main()

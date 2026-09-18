@@ -27,24 +27,19 @@ def manifest_path(dest: str) -> str:
 
 
 def read_run_manifest() -> list[tuple[str, str]]:
-    """The set of paths this deploy landed, as recorded by record()."""
-    run_manifest = os.environ.get("PI_CONFIG_RUN_MANIFEST")
-    if not run_manifest or not os.path.isfile(run_manifest):
+    """What this deploy landed, refusing an empty set.
+
+    An empty set means the landing did not happen, and converge would read
+    every path in the previous manifest as stale and remove it. Failing here
+    costs a re-run; the alternative costs the live agent directory.
+    """
+    rows = landed()
+    if not rows:
         raise SystemExit(
-            "converge: PI_CONFIG_RUN_MANIFEST is unset or missing. "
-            "A partial landing set would prune live files, so this is fatal."
+            "converge: this run landed nothing. A partial landing set would "
+            "prune live files, so this is fatal."
         )
-    rows: dict[str, str] = {}
-    with open(run_manifest, encoding="utf-8") as handle:
-        for line in handle:
-            line = line.rstrip("\n")
-            if not line:
-                continue
-            how, _, path = line.partition("\t")
-            if not path:
-                raise SystemExit(f"converge: malformed run manifest line: {line!r}")
-            rows[path] = how
-    return sorted(rows.items(), key=lambda kv: kv[0])
+    return rows
 
 
 def read_manifest(dest: str) -> list[dict[str, str]]:
@@ -169,21 +164,30 @@ def manifest_source(dest: str) -> str:
     return str(data.get("source") or "") if isinstance(data, dict) else ""
 
 
+# What this deploy has landed so far, path to how.
+#
+# One process does the whole landing now, so this is a dictionary rather than
+# the tab-delimited temp file bash and Python once passed between them. The
+# rule it serves is unchanged: the manifest is recorded as a side effect of
+# landing, never recomputed. A parallel enumeration would have to repeat every
+# live-only and optional-absent skip in landing.py, and each divergence there
+# deletes a file deploy never landed.
+_LANDED: dict[str, str] = {}
+
+
+def reset_landed() -> None:
+    """Start a new deploy. Called once, before anything lands."""
+    _LANDED.clear()
+
+
 def record(how: str, path: str) -> None:
-    """Append one landing to the run manifest deploy assembles.
+    """Note that this run landed one path, and how."""
+    _LANDED[os.path.abspath(path)] = how
 
-    The manifest is recorded, never recomputed. A parallel enumeration would
-    have to re-implement the live-only and optional-absent skips above, and
-    every divergence there becomes a deletion of a file deploy never landed.
 
-    A no-op when PI_CONFIG_RUN_MANIFEST is unset, so status and doctor are
-    unaffected.
-    """
-    run_manifest = os.environ.get("PI_CONFIG_RUN_MANIFEST")
-    if not run_manifest:
-        return
-    with open(run_manifest, "a", encoding="utf-8") as handle:
-        handle.write(f"{how}\t{os.path.abspath(path)}\n")
+def landed() -> list[tuple[str, str]]:
+    """Everything this run landed, in path order."""
+    return sorted(_LANDED.items())
 
 
 def record_new_dirs(dest: str, dest_path: str) -> None:
@@ -196,8 +200,6 @@ def record_new_dirs(dest: str, dest_path: str) -> None:
     Only components under dest are recorded. $HOME/.pi is never one, so an
     undeclared lsp-client.json removes the file and leaves ~/.pi alone.
     """
-    if not os.environ.get("PI_CONFIG_RUN_MANIFEST"):
-        return
     dest_abs = os.path.abspath(dest)
     parent = os.path.dirname(os.path.abspath(dest_path))
     parts = []

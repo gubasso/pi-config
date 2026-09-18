@@ -37,17 +37,12 @@ def dest(tmp_home: pathlib.Path) -> pathlib.Path:
 
 
 @pytest.fixture
-def landed(
-    tmp_path: pathlib.Path, tmp_home: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-):
-    """Record what this run landed, the way the deploy recipe does."""
-    run = tmp_path / "run-manifest"
-    run.write_text("")
-    monkeypatch.setenv("PI_CONFIG_RUN_MANIFEST", str(run))
+def landed(tmp_home: pathlib.Path):
+    """Record what this run landed, the way deploy does."""
+    pi_config.reset_landed()
 
     def record(how: str, path: pathlib.Path) -> None:
-        with run.open("a") as handle:
-            handle.write(f"{how}\t{path}\n")
+        pi_config.record(how, str(path))
 
     return record
 

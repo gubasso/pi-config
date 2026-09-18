@@ -11,6 +11,8 @@ says so:
     pins  manifest            the row above
     sidecars  prune  status   the two rows above
     landing  trees            the three rows above
+    deploy  doctor            the four rows above
+    check                     the five rows above
     __main__                  the command line
 
 Every name below is re-exported so a caller can say `pi_config.converge`
@@ -20,6 +22,39 @@ happens.
 
 from __future__ import annotations
 
+from .check import (
+    FORBIDDEN_PATHS,
+    FORBIDDEN_PREFIXES,
+    check,
+    prove_no_tracked_secrets,
+    tracked_files,
+)
+from .deploy import (
+    LINKED_FILES,
+    PAYLOAD_DIRS,
+    PAYLOAD_FILES,
+    copy_dir_files,
+    copy_file,
+    deploy,
+    land_payload,
+    link_tracked,
+    prove_roots,
+    refuse_store_symlink,
+)
+from .doctor import (
+    IGNORED_PATHS,
+    REQUIRED_IGNORES,
+    REQUIRED_META,
+    REQUIRED_PAYLOAD,
+    doctor,
+    fail,
+    ok,
+    prove_copy,
+    prove_dest,
+    prove_dest_location,
+    prove_link,
+    prove_source,
+)
 from .fsx import (
     copy_regular,
     hardlink_supported,
@@ -44,6 +79,7 @@ from .landing import (
 from .manifest import (
     MANIFEST_NAME,
     MANIFEST_VERSION,
+    landed,
     manifest_path,
     manifest_source,
     prove_manifest,
@@ -51,6 +87,7 @@ from .manifest import (
     read_run_manifest,
     record,
     record_new_dirs,
+    reset_landed,
     write_manifest,
     write_manifest_bytes,
 )
@@ -99,6 +136,8 @@ from .sidecars import (
     prove_json_sidecar,
 )
 from .status import (
+    describe,
+    print_header,
     print_status,
 )
 from .trees import (
@@ -111,22 +150,38 @@ from .trees import (
 
 __all__ = [
     "AGENT_PREFIX",
+    "FORBIDDEN_PATHS",
+    "FORBIDDEN_PREFIXES",
     "HOME_MIRROR",
+    "IGNORED_PATHS",
     "LANDING_ROOT",
+    "LINKED_FILES",
     "MANIFEST_NAME",
     "MANIFEST_VERSION",
+    "PAYLOAD_DIRS",
+    "PAYLOAD_FILES",
     "PRUNE_VETO_NAMES",
+    "REQUIRED_IGNORES",
+    "REQUIRED_META",
+    "REQUIRED_PAYLOAD",
     "RUNTIME_OWNED_DIRS",
     "RUNTIME_OWNED_NAMES",
     "SIDECAR_CLASSES",
     "SIDECAR_KEYS",
     "agent_payload_dir",
+    "check",
     "classify",
     "classify_stale",
     "converge",
     "converge_trees",
+    "copy_dir_files",
+    "copy_file",
     "copy_regular",
+    "deploy",
+    "describe",
+    "doctor",
     "entry_path",
+    "fail",
     "frozen_ref",
     "git_head_bytes",
     "git_ignored",
@@ -135,8 +190,11 @@ __all__ = [
     "installed_git",
     "installed_npm",
     "land_atomic_sot",
+    "land_payload",
     "land_sidecars",
+    "landed",
     "landing_roots",
+    "link_tracked",
     "live_only_dests",
     "load_pins",
     "load_plugin_sidecars",
@@ -146,26 +204,37 @@ __all__ = [
     "note_frozen",
     "note_trees",
     "npm_name",
+    "ok",
     "parse_git",
     "pi_remove",
     "plugin_docs_dir",
     "plugin_name",
     "plugins_root",
+    "print_header",
     "print_status",
+    "prove_copy",
+    "prove_dest",
+    "prove_dest_location",
     "prove_docs",
     "prove_json_sidecar",
+    "prove_link",
     "prove_manifest",
+    "prove_no_tracked_secrets",
     "prove_nofollow_regular",
+    "prove_roots",
     "prove_sidecars_landing",
     "prove_sidecars_source",
+    "prove_source",
     "prune_mode",
     "read_bytes",
     "read_manifest",
     "read_run_manifest",
     "record",
     "record_new_dirs",
+    "refuse_store_symlink",
     "relpath_ok",
     "replace_with_hardlink",
+    "reset_landed",
     "runtime_owned",
     "same_inode",
     "sidecar_dest_path",
@@ -173,6 +242,7 @@ __all__ = [
     "sidecar_source_path",
     "source_of",
     "store_owned",
+    "tracked_files",
     "unmanaged_paths",
     "within_root",
     "write_bytes",

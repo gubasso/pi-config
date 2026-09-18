@@ -47,7 +47,9 @@ class TestPins:
         self, clone: pathlib.Path, dest: pathlib.Path, capsys: pytest.CaptureFixture
     ) -> None:
         pi_config.print_status(str(clone), str(dest), [], [])
-        assert capsys.readouterr().out.strip() == "packages none"
+        out = capsys.readouterr().out
+        assert "packages none" in out
+        assert f"source {clone}" in out
 
     def test_reports_missing_docs_and_a_missing_tree(
         self, clone: pathlib.Path, dest: pathlib.Path, capsys: pytest.CaptureFixture

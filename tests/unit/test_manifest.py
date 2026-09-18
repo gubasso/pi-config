@@ -29,55 +29,54 @@ def dest(tmp_home: pathlib.Path) -> pathlib.Path:
     return path
 
 
-class TestReadRunManifest:
-    def test_reads_the_lines_record_wrote(
-        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        run = tmp_path / "run"
-        run.write_text("copy\t/dest/AGENTS.md\nsymlink\t/dest/settings.json\n")
-        monkeypatch.setenv("PI_CONFIG_RUN_MANIFEST", str(run))
+class TestTheRunRecord:
+    """What this deploy landed, held in the process that landed it.
 
-        assert pi_config.read_run_manifest() == [
+    This was a tab-delimited temp file, because bash did half the landing and
+    Python did the other half. One process does all of it now, so the record
+    is a dictionary and the file is gone.
+    """
+
+    @pytest.fixture(autouse=True)
+    def fresh(self) -> None:
+        pi_config.reset_landed()
+
+    def test_records_what_landed_and_how(self) -> None:
+        pi_config.record("copy", "/dest/AGENTS.md")
+        pi_config.record("symlink", "/dest/settings.json")
+
+        assert pi_config.landed() == [
             ("/dest/AGENTS.md", "copy"),
             ("/dest/settings.json", "symlink"),
         ]
 
-    def test_ignores_blank_lines(
-        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        run = tmp_path / "run"
-        run.write_text("copy\t/dest/a\n\n\ncopy\t/dest/b\n")
-        monkeypatch.setenv("PI_CONFIG_RUN_MANIFEST", str(run))
+    def test_stores_an_absolute_path(self, tmp_path: pathlib.Path) -> None:
+        """Prune compares against the manifest, which is always absolute."""
+        os.chdir(tmp_path)
+        pi_config.record("copy", "relative.md")
 
-        assert len(pi_config.read_run_manifest()) == 2
+        assert pi_config.landed() == [(str(tmp_path / "relative.md"), "copy")]
 
-    def test_the_last_line_for_a_path_wins(
-        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        run = tmp_path / "run"
-        run.write_text("dir\t/dest/a\ncopy\t/dest/a\n")
-        monkeypatch.setenv("PI_CONFIG_RUN_MANIFEST", str(run))
+    def test_the_last_how_for_a_path_wins(self) -> None:
+        pi_config.record("dir", "/dest/a")
+        pi_config.record("copy", "/dest/a")
 
-        assert pi_config.read_run_manifest() == [("/dest/a", "copy")]
+        assert pi_config.landed() == [("/dest/a", "copy")]
 
-    @pytest.mark.usefixtures("tmp_home")
-    def test_a_missing_run_manifest_is_fatal(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A partial landing set would read as a large prune."""
-        monkeypatch.delenv("PI_CONFIG_RUN_MANIFEST", raising=False)
-        with pytest.raises(SystemExit, match="PI_CONFIG_RUN_MANIFEST"):
+    def test_reset_starts_a_new_deploy(self) -> None:
+        pi_config.record("copy", "/dest/a")
+        pi_config.reset_landed()
+
+        assert pi_config.landed() == []
+
+    def test_an_empty_record_is_fatal(self) -> None:
+        """Landing nothing would read as every previous path being stale."""
+        with pytest.raises(SystemExit, match="landed nothing"):
             pi_config.read_run_manifest()
 
-    def test_a_malformed_line_is_fatal(
-        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        run = tmp_path / "run"
-        run.write_text("no-tab-here\n")
-        monkeypatch.setenv("PI_CONFIG_RUN_MANIFEST", str(run))
-
-        with pytest.raises(SystemExit, match="malformed"):
-            pi_config.read_run_manifest()
+    def test_a_non_empty_record_is_what_converge_reads(self) -> None:
+        pi_config.record("copy", "/dest/AGENTS.md")
+        assert pi_config.read_run_manifest() == [("/dest/AGENTS.md", "copy")]
 
 
 class TestWriteAndReadManifest:
