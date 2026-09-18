@@ -90,12 +90,15 @@ pi_setup() {
 # adopt tests also have to delete a payload file, which must never happen in
 # the tree the test itself runs from.
 #
-# The copy takes every tracked path from the working tree rather than from
-# HEAD, so a test covers the edit in front of you and not the last commit.
+# The copy takes what git would stage, not what HEAD holds, so a test covers
+# the edit in front of you rather than the last commit. `--others` is what
+# includes a file that is new and not yet added: without it a test runs
+# against a tree missing the module you just wrote, and fails for a reason
+# that has nothing to do with the change.
 pi_sandbox_repo() {
   local dst="$BATS_TEST_TMPDIR/repo"
   mkdir -p "$dst"
-  git -C "$PI_REPO" ls-files -z |
+  git -C "$PI_REPO" ls-files --cached --others --exclude-standard -z |
     tar -C "$PI_REPO" --null --files-from=- -cf - |
     tar -C "$dst" -xf -
 
