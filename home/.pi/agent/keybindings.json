@@ -1,0 +1,7 @@
+{
+  "tui.editor.historyPrevious": "ctrl+p",
+  "tui.editor.historyNext": "ctrl+n",
+  "app.model.cycleForward": "alt+]",
+  "app.model.cycleBackward": "alt+["
+}
+
