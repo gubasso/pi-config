@@ -179,7 +179,13 @@ intercom/broker.*
 *.log
 ```
 
-Deploy never creates any of these, so none of them can enter the manifest, so prune cannot reach them. The list documents the boundary. The manifest enforces it. `missions/` is written by the pi-subagents package and `intercom/broker.*` by pi-intercom, which is why neither is a sidecar.
+Deploy never creates any of these, so a manifest deploy wrote can never name one. That is the first line of defence, and it is the one that matters in normal operation.
+
+It is not a proof. The manifest sits at the destination, so anything able to write there could name `auth.json` or a session transcript for deletion. Treat the manifest as trusted state, like the agent directory it lives in. Behind it sits a hard veto: prune refuses any path whose name or parent directory belongs to the runtime-owned set above, whatever the manifest says. A corrupted or hand-edited manifest therefore fails the run instead of destroying a credential.
+
+Deploy also refuses to run when a landing root is itself a symlink. Both halves of the containment check move with the root, so a swapped `~/.pi` would silently redirect every landing and every deletion.
+
+`missions/` is written by the pi-subagents package and `intercom/broker.*` by pi-intercom, which is why neither is a sidecar.
 
 Do not invent alternate folder names (`lib/skills`, `plugins/`) inside `home/.pi/agent/` unless those paths are listed in `settings.json`. Stock names are the convention so deploy is a copy or a symlink of those paths.
 
@@ -611,7 +617,7 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - `flake.nix` and `.envrc` supply the toolchain; `.pre-commit-config.yaml` holds the gates. The two never merge: no `git-hooks.nix`, no `flake-parts`, no `treefmt-nix`. A gate is readable without evaluating Nix, and the shell is buildable without running a gate.
 - dprint formats markdown and JSON, except the JSON Pi writes at runtime. The runtime owns the bytes of a file it writes.
 - `just deploy` converges. It lands what the repo declares and removes what the repo stopped declaring, so this repository is the state of the live agent dir rather than a floor under it.
-- The deploy manifest at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/.pi-config-manifest.json` records what deploy created. Prune considers only paths in it, so a file Pi wrote can never be a candidate.
+- The deploy manifest at `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/.pi-config-manifest.json` records what deploy created. Prune considers only paths in it. The manifest is trusted state rather than proof, so a runtime-owned name is vetoed before deletion whatever the manifest claims, and the landing roots are policy derived in code rather than fields read back from that file.
 - The manifest is recorded as a side effect of landing, never recomputed. A parallel enumeration would have to repeat the `live-only` and optional-absent skips, and a divergence there deletes a secret-bearing sidecar.
 - Prune uses `os.remove` and `os.rmdir` only, never a recursive delete, so a directory holding both deploy's file and a package's runtime file survives by construction.
 - A file that predates the manifest is reported as unmanaged and removed only by `just deploy-adopt`.

@@ -790,9 +790,19 @@ def landing_roots(dest: str) -> list[str]:
     Derived here and never read back from the manifest. Roots stored beside
     the paths they authorize would be circular: editing one field of an
     untrusted document would licence deleting anything it named. LANDING_ROOT
-    below is what keeps a sidecar path inside these two.
+    is what keeps a sidecar path inside these two.
+
+    A root that is itself a symlink is fatal. Both halves of within_root move
+    with it, so a swapped root would silently redirect every landing and every
+    deletion to wherever it points.
     """
-    return [os.path.abspath(dest), os.path.abspath(os.path.expanduser("~/.pi"))]
+    roots = [os.path.abspath(dest), os.path.abspath(os.path.expanduser("~/.pi"))]
+    for root in roots:
+        if os.path.islink(root):
+            raise SystemExit(
+                f"landing root {root} is a symlink; refusing to land or prune through it"
+            )
+    return roots
 
 
 def within_root(target: str, root: str) -> bool:
@@ -938,6 +948,28 @@ RUNTIME_OWNED_DIRS = {
 }
 
 
+def runtime_owned(target: str, roots: list[str]) -> bool:
+    """True when a path names something Pi or one of its packages writes.
+
+    A hard veto in front of every deletion. Deploy never lands these, so a
+    manifest naming one did not come from a deploy.
+
+    Directory names are matched only below a landing root, never against the
+    absolute path: a dest of /tmp/x/agent would otherwise match `tmp` and veto
+    every prune.
+    """
+    name = os.path.basename(target)
+    if name in RUNTIME_OWNED_NAMES or name.endswith(".log"):
+        return True
+    absolute = os.path.abspath(target)
+    for root in roots:
+        prefix = os.path.abspath(root) + os.sep
+        if absolute.startswith(prefix):
+            rel = absolute[len(prefix) :]
+            return any(part in RUNTIME_OWNED_DIRS for part in rel.split(os.sep))
+    return False
+
+
 def prune_mode() -> str:
     mode = os.environ.get("PI_CONFIG_PRUNE", "apply")
     if mode not in ("apply", "report", "adopt"):
@@ -1000,6 +1032,12 @@ def classify_stale(
     real = entry_path(target)
     if os.path.realpath(target) in protected or real in protected:
         return "keep"
+    # Defence in depth. The manifest is trusted state, not proof: it sits at
+    # the dest, so anything able to write there could name auth.json or a
+    # session for deletion. Deploy never lands these names, so a manifest row
+    # carrying one is a corrupted or hand-edited file, never a real landing.
+    if runtime_owned(target, roots):
+        raise SystemExit(f"refusing to prune a runtime-owned path: {target}")
     src_abs = os.path.realpath(src)
     if not any(within_root(target, root) for root in roots):
         raise SystemExit(f"refusing to prune outside the landing roots: {target}")
