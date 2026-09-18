@@ -10,7 +10,12 @@ src := justfile_directory()
 # to be importable. Setting it here means one declaration rather than one per
 # call site, and it is also what lets the test suite import the same module
 # the recipes run.
-export PYTHONPATH := src / "scripts"
+#
+# Prepended, never assigned. The devshell puts every Nix Python package on
+# PYTHONPATH, so a bare assignment hides pyyaml from the meta tests and
+# pre-commit from its own entry point. That failure only shows up under
+# `just`, which is the one path the gate uses.
+export PYTHONPATH := src / "scripts" + if env("PYTHONPATH", "") == "" { "" } else { ":" + env("PYTHONPATH", "") }
 
 # List available recipes
 default:

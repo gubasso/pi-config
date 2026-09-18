@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import subprocess
 
 import pytest
 
@@ -20,15 +21,28 @@ pytestmark = [pytest.mark.fast, pytest.mark.local, pytest.mark.ci]
 
 @pytest.fixture
 def clone(tmp_path: pathlib.Path, tmp_home: pathlib.Path) -> pathlib.Path:
-    """A payload with the files doctor requires and nothing else."""
+    """A source tree deploy will accept.
+
+    Deploy proves the clone before it writes or deletes anything, so a
+    fixture carrying only the payload is no longer enough.
+    """
     root = tmp_path / "clone"
     agent = root / "home" / ".pi" / "agent"
     (agent / "prompts").mkdir(parents=True)
     (agent / "extensions").mkdir()
+    (root / "home" / ".pi" / "lsp-client.json").write_text("{}")
+
+    for name in pi_config.REQUIRED_META:
+        (root / name).write_text("x\n")
+    (root / ".gitignore").write_text(
+        "\n".join(pi_config.REQUIRED_IGNORES) + "\n/home/.pi/agent/models-store.json\n"
+    )
     (agent / "AGENTS.md").write_text("# payload rules\n")
     (agent / "prompts" / "review.md").write_text("# review\n")
     (agent / "extensions" / "worktree-guard.ts").write_text("// guard\n")
     (agent / "settings.json").write_text('{"packages":[]}')
+
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
     return root
 
 
@@ -179,7 +193,7 @@ class TestDeploy:
         (tmp_home / ".pi").symlink_to(elsewhere)
 
         with pytest.raises(SystemExit, match="symlink"):
-            pi_config.deploy(str(clone), str(dest), [])
+            pi_config.deploy(str(clone), str(dest), [], [])
 
         assert not (elsewhere / "agent").exists()
 
@@ -190,12 +204,12 @@ class TestDeploy:
         (dest / "AGENTS.md").symlink_to("/nix/store/does-not-exist-agents-md")
 
         with pytest.raises(SystemExit, match="Home Manager"):
-            pi_config.deploy(str(clone), str(dest), [])
+            pi_config.deploy(str(clone), str(dest), [], [])
 
     def test_creates_the_destination_and_returns_it_resolved(
         self, clone: pathlib.Path, dest: pathlib.Path
     ) -> None:
-        got = pi_config.deploy(str(clone), str(dest), [])
+        got = pi_config.deploy(str(clone), str(dest), [], [])
 
         assert got == os.path.realpath(dest)
         assert (dest / "AGENTS.md").exists()
@@ -206,7 +220,58 @@ class TestDeploy:
         """A landing carried over from a previous run would hide a prune."""
         pi_config.record("copy", str(dest / "from-a-previous-run.md"))
 
-        pi_config.deploy(str(clone), str(dest), [])
+        pi_config.deploy(str(clone), str(dest), [], [])
 
         recorded = {path for path, _ in pi_config.landed()}
         assert str(dest / "from-a-previous-run.md") not in recorded
+
+
+class TestDeployPreflight:
+    """Nothing is written or deleted until the clone has been proved.
+
+    Deploy converges, so it deletes. Proving the source only afterwards
+    means a tree missing a required payload file has already had the live
+    copy pruned by the time doctor says so.
+    """
+
+    def test_a_missing_required_payload_file_leaves_the_destination_alone(
+        self, clone: pathlib.Path, dest: pathlib.Path
+    ) -> None:
+        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), [], []))
+        assert (landed / "prompts" / "review.md").exists()
+
+        (clone / "home" / ".pi" / "agent" / "prompts" / "review.md").unlink()
+
+        with pytest.raises(SystemExit, match="missing"):
+            pi_config.deploy(str(clone), str(dest), [], [])
+
+        # The run failed, and it failed before pruning what it could no
+        # longer land.
+        assert (landed / "prompts" / "review.md").exists()
+
+    def test_a_destination_inside_the_clone_is_never_written_to(
+        self, clone: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The clone is source. Deploy onto it would land onto itself."""
+        inside = clone / "home" / ".pi" / "agent"
+        monkeypatch.setenv("PI_CODING_AGENT_DIR", str(inside))
+        before = sorted(p.name for p in inside.iterdir())
+
+        with pytest.raises(SystemExit, match="inside this clone"):
+            pi_config.deploy(str(clone), str(inside), [], [])
+
+        assert sorted(p.name for p in inside.iterdir()) == before
+
+    def test_a_symlinked_payload_destination_does_not_truncate_its_target(
+        self, clone: pathlib.Path, dest: pathlib.Path, tmp_home: pathlib.Path
+    ) -> None:
+        """The end-to-end form of the copy_regular regression."""
+        dest.mkdir(parents=True)
+        victim = dest / "auth.json"
+        victim.write_text('{"token":"secret"}')
+        (dest / "AGENTS.md").symlink_to(victim)
+
+        pi_config.deploy(str(clone), str(dest), [], [])
+
+        assert victim.read_text() == '{"token":"secret"}'
+        assert (dest / "AGENTS.md").read_text() == "# payload rules\n"

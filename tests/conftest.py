@@ -12,8 +12,10 @@ directory, and `tmp_home` is how a test says so.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
+import stat
 import sys
 
 import pytest
@@ -103,10 +105,30 @@ def git_is_not_inherited(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def payload_listing() -> set[str]:
-    """Every path under the tracked payload, as names only."""
+def payload_listing() -> set[tuple[str, str]]:
+    """Every path under the tracked payload, with enough state to notice a write.
+
+    Names alone would miss the mutations that matter: overwriting a file,
+    retargeting a symlink that still resolves, or changing a mode. Each of
+    those can be staged by later work, which is the failure this guard
+    exists to prevent, so each is part of the snapshot.
+    """
     payload = ROOT / "home"
-    return {str(path.relative_to(ROOT)) for path in payload.rglob("*") if path.exists()}
+    snapshot: set[tuple[str, str]] = set()
+    for path in payload.rglob("*"):
+        try:
+            info = path.lstat()
+        except OSError:
+            continue
+        rel = str(path.relative_to(ROOT))
+        if path.is_symlink():
+            state = f"link:{os.readlink(path)}"
+        elif path.is_dir():
+            state = "dir"
+        else:
+            state = f"file:{oct(stat.S_IMODE(info.st_mode))}:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+        snapshot.add((rel, state))
+    return snapshot
 
 
 @pytest.fixture(autouse=True)
@@ -119,15 +141,16 @@ def payload_is_read_only():
     `git add -A` and staged as a real change. That already happened once
     here, and nothing reported it.
 
-    Checking names rather than contents keeps this cheap: the payload is a
-    handful of files, and a stray landing always adds a path.
+    The snapshot carries content, mode, and symlink target, not only names.
+    Overwriting a tracked payload file, or retargeting a symlink that still
+    resolves, changes no name and is exactly as stageable.
     """
     before = payload_listing()
     yield
     after = payload_listing()
     assert after == before, (
         "a test wrote into the repository payload: "
-        f"added {sorted(after - before)}, removed {sorted(before - after)}"
+        f"appeared {sorted(after - before)}, gone {sorted(before - after)}"
     )
 
 

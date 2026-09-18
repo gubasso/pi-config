@@ -30,8 +30,8 @@ LAYERS = {
     "status": 2,
     "landing": 3,
     "trees": 3,
-    "deploy": 4,
     "doctor": 4,
+    "deploy": 5,
     "check": 5,
     "__main__": 6,
 }

@@ -133,3 +133,25 @@ def test_the_bats_helper_detaches_from_git_before_anything_runs(
     unset = helper.index("unset GIT_INDEX_FILE")
     first_use = helper.index('export HOME="$BATS_TEST_TMPDIR/home"')
     assert unset < first_use
+
+
+def test_the_payload_guard_notices_a_mutation_that_adds_no_path(
+    repo_root: pathlib.Path,
+) -> None:
+    """Overwriting a tracked file changes no name, and is just as stageable.
+
+    The first version of this guard compared names only, so a test could
+    rewrite a payload file's bytes, retarget a symlink that still resolved,
+    or change a mode, and the guard would agree nothing happened.
+    """
+    from conftest import payload_listing
+
+    target = repo_root / "home" / ".pi" / "agent" / "AGENTS.md"
+    before = payload_listing()
+    original = target.read_bytes()
+    try:
+        target.write_bytes(original + b"\n<!-- guard probe -->\n")
+        assert payload_listing() != before
+    finally:
+        target.write_bytes(original)
+    assert payload_listing() == before

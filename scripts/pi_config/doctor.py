@@ -84,15 +84,25 @@ def ok(message: str) -> None:
 
 
 def prove_source(
-    src: str, pins: list[dict[str, str]], sidecars: list[dict[str, object]]
+    src: str,
+    pins: list[dict[str, str]],
+    sidecars: list[dict[str, object]],
+    quiet: bool = False,
 ) -> None:
+    """Prove the clone. `quiet` proves without narrating, for the preflight.
+
+    Deploy runs this before it writes anything, and doctor runs it again
+    afterwards. Printing both times would double every `ok` line for no
+    reader's benefit, so the first pass speaks only when it fails.
+    """
+    say = (lambda _message: None) if quiet else ok
     payload = os.path.join(src, "home")
     agent_src = agent_payload_dir(src)
 
     for name in REQUIRED_META:
         if not os.path.isfile(os.path.join(src, name)):
             fail(f"missing {os.path.join(src, name)}")
-        ok(f"meta {name}")
+        say(f"meta {name}")
 
     if os.path.lexists(os.path.join(src, "AGENTS.override.md")):
         fail("AGENTS.override.md was replaced by the root AGENTS.md; delete it")
@@ -100,32 +110,50 @@ def prove_source(
     for rel in REQUIRED_PAYLOAD:
         if not os.path.isfile(os.path.join(payload, *rel.split("/"))):
             fail(f"missing {os.path.join(payload, rel)}")
-        ok(f"payload {rel}")
+        say(f"payload {rel}")
 
     gitignore = open(os.path.join(src, ".gitignore"), encoding="utf-8").read()
     lines = gitignore.splitlines()
     for line in REQUIRED_IGNORES:
         if line not in lines:
             fail(f".gitignore missing {line}")
-    ok("gitignore lines")
+    say("gitignore lines")
 
     for rel in IGNORED_PATHS:
         if not git_ignored(src, rel):
             fail(f"not ignored: {rel}")
-    ok("check-ignore")
+    say("check-ignore")
 
     try:
         json.load(open(os.path.join(agent_src, "settings.json"), encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         fail("settings.json is not JSON")
-    ok("settings.json json")
+    say("settings.json json")
 
     prove_docs(src, pins)
     prove_sidecars_source(src, sidecars)
 
     if store_owned(os.path.join(agent_src, "AGENTS.md")):
         fail("source payload AGENTS.md is a store symlink")
-    ok("source payload AGENTS.md not store")
+    say("source payload AGENTS.md not store")
+
+
+def preflight(
+    src: str,
+    dest: str,
+    pins: list[dict[str, str]],
+    sidecars: list[dict[str, object]],
+) -> None:
+    """Everything that must hold before a landing writes or deletes anything.
+
+    Deploy converges, so it deletes. Proving the clone only afterwards means
+    a source tree missing a required payload file has already had the live
+    copy pruned by the time doctor says so, and a destination pointing
+    inside the clone has already been written to. Both proofs are read-only,
+    so running them first costs nothing and removes that window.
+    """
+    prove_source(src, pins, sidecars, quiet=True)
+    prove_dest_location(src, dest)
 
 
 def prove_dest_location(src: str, dest: str) -> None:

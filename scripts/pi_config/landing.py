@@ -24,9 +24,11 @@ from .fsx import (
 from .gitx import git_head_bytes, git_ignored, git_tracked
 from .manifest import record, record_new_dirs
 from .paths import (
+    landing_roots,
     sidecar_dest_path,
     sidecar_repo_path,
     sidecar_source_path,
+    within_root,
 )
 from .sidecars import prove_json_sidecar
 
@@ -83,6 +85,13 @@ def prove_sidecars_source(src: str, sidecars: list[dict[str, object]]) -> None:
         if os.path.lexists(source_path) and not os.path.isfile(source_path):
             raise SystemExit(f"source sidecar {rel} is not a regular file")
         if os.path.isfile(source_path):
+            # Present but untracked passes every local gate and is absent
+            # from the commit, so a fresh clone cannot deploy. .gitignore
+            # cannot catch this: the file is neither ignored nor added.
+            if not git_tracked(src, repo_rel):
+                raise SystemExit(
+                    f"{klass} sidecar {rel} exists but is untracked; git add it"
+                )
             prove_json_sidecar(source_path, rel)
             print(f"ok  sidecar source {klass} {rel}")
         else:
@@ -156,6 +165,16 @@ def land_sidecars(src: str, dest: str, sidecars: list[dict[str, object]]) -> Non
             continue
         if store_owned(dest_path):
             raise SystemExit(f"Home Manager still owns {dest_path} (store symlink).")
+        # A sidecar path is validated as relative and under .pi/, but that
+        # says nothing about the destination. Replace an intermediate
+        # directory such as `intercom` with a symlink and every landing
+        # below it goes wherever the link points. within_root judges the
+        # entry both lexically and physically, so the physical half is what
+        # catches exactly that.
+        if not any(within_root(dest_path, root) for root in landing_roots(dest)):
+            raise SystemExit(
+                f"refusing to land {rel} outside the landing roots: {dest_path}"
+            )
         record_new_dirs(dest, dest_path)
         os.makedirs(os.path.dirname(dest_path) or dest, exist_ok=True)
         if klass == "symlink":

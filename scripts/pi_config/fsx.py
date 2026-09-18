@@ -46,6 +46,20 @@ def same_inode(left: str, right: str) -> bool:
 
 
 def copy_regular(source_path: str, dest_path: str) -> None:
+    """Replace the destination entry, never write through it.
+
+    shutil.copyfile opens the destination for writing, which follows a
+    trailing symlink and truncates its target. A live AGENTS.md pointing at
+    auth.json would therefore have the credential overwritten with payload
+    bytes and then chmod 0644.
+
+    The bash this replaced used `install`, which unlinks first, so removing
+    the entry here is what keeps the behavior the same. Unlinking is also
+    what makes the mode below apply to a file this function owns rather
+    than to whatever the link pointed at.
+    """
+    if os.path.lexists(dest_path):
+        os.remove(dest_path)
     shutil.copyfile(source_path, dest_path)
     os.chmod(dest_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 

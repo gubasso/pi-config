@@ -261,3 +261,70 @@ class TestLandAtomicSot:
 
         with pytest.raises(SystemExit, match="not in HEAD"):
             self.land(clone, dest)
+
+
+@pytest.mark.usefixtures("recording")
+class TestLandingStaysInsideTheRoots:
+    """A sidecar path is validated relative; the destination is not.
+
+    Validation proves the declared path is relative and under `.pi/`, which
+    says nothing about what the destination looks like at landing time.
+    Replace an intermediate directory with a symlink and every landing below
+    it follows the link.
+    """
+
+    def test_a_symlinked_parent_directory_refuses_the_landing(
+        self, clone: pathlib.Path, dest: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        sidecar(clone, ".pi/agent/intercom/config.json", "{}")
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (dest / "intercom").symlink_to(outside)
+
+        with pytest.raises(SystemExit, match="outside the landing roots"):
+            pi_config.land_sidecars(
+                str(clone),
+                str(dest),
+                [row(".pi/agent/intercom/config.json", "copy")],
+            )
+
+        assert not (outside / "config.json").exists()
+
+    def test_a_real_nested_directory_still_lands(
+        self, clone: pathlib.Path, dest: pathlib.Path
+    ) -> None:
+        sidecar(clone, ".pi/agent/intercom/config.json", "{}")
+
+        pi_config.land_sidecars(
+            str(clone), str(dest), [row(".pi/agent/intercom/config.json", "copy")]
+        )
+
+        assert (dest / "intercom" / "config.json").read_text() == "{}"
+
+
+class TestProveSidecarsSourceRequiresTracking:
+    """A present but untracked sidecar passes every local gate and is absent
+    from the commit, so a fresh clone cannot deploy. .gitignore cannot catch
+    it: the file is neither ignored nor added."""
+
+    def test_an_untracked_present_sidecar_fails(self, clone: pathlib.Path) -> None:
+        sidecar(clone, ".pi/agent/thing.json", "{}")
+
+        with pytest.raises(SystemExit, match="untracked"):
+            pi_config.prove_sidecars_source(
+                str(clone), [row(".pi/agent/thing.json", "copy")]
+            )
+
+    def test_a_tracked_sidecar_passes(self, clone: pathlib.Path) -> None:
+        sidecar(clone, ".pi/agent/thing.json", "{}")
+        commit(clone)
+
+        pi_config.prove_sidecars_source(
+            str(clone), [row(".pi/agent/thing.json", "copy")]
+        )
+
+    def test_an_optional_absent_sidecar_still_passes(self, clone: pathlib.Path) -> None:
+        """Absent is a state; untracked-but-present is a mistake."""
+        pi_config.prove_sidecars_source(
+            str(clone), [row(".pi/agent/absent.json", "copy", required=False)]
+        )

@@ -15,7 +15,7 @@ Order is the contract, and every step of it is load-bearing:
     recording each one as it lands.
 4.  Converge: remove what the previous manifest recorded and this run did
     not land again.
-5.  Prove the result with doctor.
+5.  Prove the result with doctor, which repeats the source proof aloud.
 6.  Converge install trees last, because `pi remove` runs npm and can need
     the network. A failure there leaves the config correct and only an
     install tree orphaned.
@@ -24,9 +24,9 @@ Order is the contract, and every step of it is load-bearing:
 from __future__ import annotations
 
 import os
-import shutil
 
-from .fsx import store_owned
+from .doctor import preflight
+from .fsx import copy_regular, store_owned
 from .landing import land_sidecars
 from .manifest import record, reset_landed
 from .paths import agent_payload_dir, landing_roots
@@ -54,8 +54,7 @@ def refuse_store_symlink(path: str, hint: str = "") -> None:
 
 
 def copy_file(source: str, dest_path: str) -> None:
-    shutil.copyfile(source, dest_path)
-    os.chmod(dest_path, 0o644)
+    copy_regular(source, dest_path)
     record("copy", dest_path)
     print(f"copied {dest_path}")
 
@@ -115,7 +114,12 @@ def land_payload(src: str, dest: str) -> None:
             link_tracked(source, os.path.join(dest, name))
 
 
-def deploy(src: str, dest: str, sidecars: list[dict[str, object]]) -> str:
+def deploy(
+    src: str,
+    dest: str,
+    pins: list[dict[str, str]],
+    sidecars: list[dict[str, object]],
+) -> str:
     """Land everything the repository declares. Returns the resolved dest.
 
     Converging and proving are the caller's next two steps, because doctor
@@ -123,7 +127,8 @@ def deploy(src: str, dest: str, sidecars: list[dict[str, object]]) -> str:
     """
     reset_landed()
 
-    # Before anything lands.
+    # Before anything lands, and before anything is deleted.
+    preflight(src, dest, pins, sidecars)
     prove_roots(dest)
 
     os.makedirs(dest, exist_ok=True)

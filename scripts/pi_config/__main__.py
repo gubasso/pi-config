@@ -63,7 +63,7 @@ def main() -> None:
     # install trees. Trees go last because `pi remove` runs npm and can need
     # the network: a failure there leaves the config correct and only an
     # install tree orphaned.
-    dest = deploy(src, dest, sidecars)
+    dest = deploy(src, dest, pins, sidecars)
     doctor(src, dest, pins, sidecars)
     converge_trees(dest, pins)
 

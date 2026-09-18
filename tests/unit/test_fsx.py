@@ -154,3 +154,46 @@ class TestProveNofollowRegular:
     def test_refuses_a_missing_file(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(SystemExit):
             pi_config.prove_nofollow_regular(str(tmp_path / "absent"), "absent")
+
+
+class TestCopyRegularDoesNotWriteThroughASymlink:
+    """The destination entry is replaced, never opened through.
+
+    This is a regression the move from bash to Python introduced and a
+    review caught. `install -m 0644` unlinks the destination first, so a
+    symlinked destination is replaced. `shutil.copyfile` opens it for
+    writing, which follows the link and truncates whatever it points at.
+    """
+
+    def test_a_symlinked_destination_is_replaced_not_followed(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        victim = tmp_path / "auth.json"
+        victim.write_text('{"token":"secret"}')
+        source = tmp_path / "AGENTS.md"
+        source.write_text("# payload")
+        dest = tmp_path / "dest" / "AGENTS.md"
+        dest.parent.mkdir()
+        dest.symlink_to(victim)
+
+        pi_config.copy_regular(str(source), str(dest))
+
+        assert victim.read_text() == '{"token":"secret"}'
+        assert not dest.is_symlink()
+        assert dest.read_text() == "# payload"
+
+    def test_the_mode_lands_on_the_new_file_not_the_target(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        victim = tmp_path / "auth.json"
+        victim.write_text("{}")
+        victim.chmod(0o600)
+        source = tmp_path / "AGENTS.md"
+        source.write_text("x")
+        dest = tmp_path / "dest" / "AGENTS.md"
+        dest.parent.mkdir()
+        dest.symlink_to(victim)
+
+        pi_config.copy_regular(str(source), str(dest))
+
+        assert stat.S_IMODE(victim.stat().st_mode) == 0o600

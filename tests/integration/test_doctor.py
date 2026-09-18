@@ -150,13 +150,13 @@ class TestDoctor:
     def test_proves_a_landed_destination(
         self, clone: pathlib.Path, dest: pathlib.Path
     ) -> None:
-        landed = pi_config.deploy(str(clone), str(dest), [])
+        landed = pi_config.deploy(str(clone), str(dest), [], [])
         pi_config.doctor(str(clone), landed, [], [])
 
     def test_fails_when_a_copy_stops_matching_its_source(
         self, clone: pathlib.Path, dest: pathlib.Path
     ) -> None:
-        landed = pi_config.deploy(str(clone), str(dest), [])
+        landed = pi_config.deploy(str(clone), str(dest), [], [])
         (pathlib.Path(landed) / "AGENTS.md").write_text("edited at the destination")
 
         with pytest.raises(SystemExit, match="does not match source"):
@@ -165,7 +165,7 @@ class TestDoctor:
     def test_fails_when_a_link_becomes_a_copy(
         self, clone: pathlib.Path, dest: pathlib.Path
     ) -> None:
-        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), []))
+        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), [], []))
         (landed / "settings.json").unlink()
         (landed / "settings.json").write_text("{}")
 
@@ -175,7 +175,7 @@ class TestDoctor:
     def test_fails_when_a_link_points_somewhere_else(
         self, clone: pathlib.Path, dest: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), []))
+        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), [], []))
         decoy = tmp_path / "decoy.json"
         decoy.write_text("{}")
         (landed / "settings.json").unlink()
@@ -187,7 +187,7 @@ class TestDoctor:
     def test_fails_when_auth_json_is_readable_by_others(
         self, clone: pathlib.Path, dest: pathlib.Path
     ) -> None:
-        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), []))
+        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), [], []))
         auth = landed / "auth.json"
         auth.write_text('{"token":"secret"}')
         auth.chmod(0o644)
@@ -199,7 +199,7 @@ class TestDoctor:
         self, clone: pathlib.Path, dest: pathlib.Path
     ) -> None:
         """Landing them would give the agent this repo's rules everywhere."""
-        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), []))
+        landed = pathlib.Path(pi_config.deploy(str(clone), str(dest), [], []))
         payload = clone / "home" / ".pi" / "agent" / "AGENTS.md"
         payload.write_text((clone / "AGENTS.md").read_text())
         (landed / "AGENTS.md").write_text((clone / "AGENTS.md").read_text())
