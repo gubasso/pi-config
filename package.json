@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "keywords": ["pi-package"],
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "vitest": "^5.0.1"
+  },
   "pi": {
     "extensions": ["./home/.pi/agent/extensions"],
     "prompts": ["./home/.pi/agent/prompts"]

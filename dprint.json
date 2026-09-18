@@ -5,10 +5,16 @@
   "json": {
     "indentWidth": 2
   },
+  "typescript": {
+    "indentWidth": 2,
+    "quoteStyle": "alwaysDouble"
+  },
   "includes": [
     "**/*.md",
     "**/*.json",
-    "**/*.jsonc"
+    "**/*.jsonc",
+    "**/*.ts",
+    "**/*.mts"
   ],
   "excludes": [
     ".git",
@@ -24,6 +30,7 @@
   ],
   "plugins": [
     "https://plugins.dprint.dev/markdown-0.22.0.wasm",
-    "https://plugins.dprint.dev/json-0.23.0.wasm"
+    "https://plugins.dprint.dev/json-0.23.0.wasm",
+    "https://plugins.dprint.dev/typescript-0.96.1.wasm"
   ]
 }

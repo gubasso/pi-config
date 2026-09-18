@@ -54,7 +54,7 @@ const REASON = [
   "For a deliberate one-off, prefix the command with `PI_ALLOW_GIT_WORKTREE=1`.",
 ].join(" ");
 
-export default function (pi: ExtensionAPI): void {
+export default function(pi: ExtensionAPI): void {
   pi.on("tool_call", (event: ToolCallEvent): ToolCallEventResult | void => {
     if (event.toolName !== "bash") return;
 

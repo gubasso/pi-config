@@ -27,6 +27,7 @@
 
 # Repo-wide
 __pycache__/
+.pytest_cache/
 .env
 .env.*
 !.env.example
@@ -35,6 +36,8 @@ node_modules/
 
 # Nix / direnv
 .direnv/
+# The devShell symlinks the Pi type definitions here for tsc. Nix owns it.
+/.pi-types
 /.envrc.local
 /result
 

@@ -17,8 +17,14 @@ indent_size = 2
 indent_style = space
 indent_size = 4
 
-# Local Pi extensions under home/.pi/agent/extensions/.
+# Local Pi extensions under home/.pi/agent/extensions/, and the vitest suite.
 [*.ts]
+indent_style = space
+indent_size = 2
+
+# scripts/run-tests.sh, tests/helpers/*.bash, and tests/e2e/*.bats. shfmt
+# formats them; this block is what shfmt -i 2 and the checker agree on.
+[*.{sh,bash,bats}]
 indent_style = space
 indent_size = 2
 

@@ -42,17 +42,37 @@
               just
               # The gate runner.
               pre-commit
-              # scripts/package-pins.py, and the doctor's JSON probes.
-              python3
+              # scripts/pi_config/, the doctor's JSON probes, and the
+              # Python half of the test suite. pytest rides along with the
+              # interpreter so no test runner reaches PATH from outside Nix.
+              (python3.withPackages (ps: [ ps.pytest ]))
               # markdownlint-cli2 runs on this node through
               # `language_version: system`. pre-commit's own nodeenv
               # downloads a generic-glibc node whose ELF interpreter
               # /lib64/ld-linux-x86-64.so.2 does not exist on this host.
               nodejs
-              # The formatter of record for markdown and JSON. dprint.json
-              # lists what it must not touch.
+              # Builds node_modules from package-lock.json and links it into
+              # the tree. See the npmDeps attribute and the shellHook below.
+              importNpmLock.hooks.linkNodeModulesHook
+              # tests/e2e/: the justfile recipes, driven as a person drives
+              # them. The three libraries carry `assert_output`,
+              # `assert_success`, and the file predicates.
+              (bats.withLibraries (p: [
+                p.bats-support
+                p.bats-assert
+                p.bats-file
+              ]))
+              # scripts/run-tests.sh and tests/helpers/*.bash are the only
+              # shell this tree authors. Nothing linted them before.
+              shellcheck
+              shfmt
+              # `tsc --noEmit` over tsconfig.json, for the payload
+              # extensions and the vitest suite.
+              typescript
+              # The formatter of record for markdown, JSON, and TypeScript.
+              # dprint.json lists what it must not touch.
               dprint
-              # scripts/package-pins.py (CLI + `ruff server`).
+              # scripts/pi_config/ and tests/**/*.py (CLI + `ruff server`).
               ruff
               typos
               committed
@@ -77,11 +97,53 @@
               marksman # .md; not a pi-lsp-client builtin
             ];
 
-            # The greeting goes to standard error, because `nix develop
-            # --command` shares the command's stdout: on stdout this banner
-            # is prepended to whatever the command emits, which silently
-            # corrupts every redirected artifact.
-            shellHook = ''echo "pi-config dev shell ready" >&2'';
+            # node_modules, built by Nix from package-lock.json. There is no
+            # hash to compute here and none to re-compute on a bump: the
+            # lockfile is the pin. `npmRoot` is read at evaluation time for
+            # package.json and package-lock.json only, and the derivation
+            # sets `dontUnpack`, so nothing else in this tree is an input
+            # and an unrelated edit does not rebuild it.
+            #
+            # vitest therefore reaches PATH the same way every other gate
+            # tool does, which keeps the §14 rule intact: no test runner is
+            # installed by hand, and a fresh clone is ready after `direnv
+            # allow` with no npm step.
+            npmDeps = pkgs.importNpmLock.buildNodeModules {
+              npmRoot = ./.;
+              inherit (pkgs) nodejs;
+            };
+
+            # Two things this hook needs, and neither is automatic.
+            #
+            # linkNodeModulesHook installs itself as the shell hook only
+            # when `shellHook` is unset, so setting one here would silently
+            # drop node_modules. Call it by name instead.
+            #
+            # It also narrates to stdout. `nix develop --command` shares the
+            # command's stdout, so that narration is prepended to whatever
+            # the command emits and corrupts every redirected artifact.
+            # Both the hook and the greeting go to standard error.
+            #
+            # `.pi-types` is how `tsc` resolves the one import the payload
+            # extensions carry, `@earendil-works/pi-coding-agent`. The types
+            # come from the same nixpkgs pin as everything else, so they can
+            # never drift from the Pi this shell describes. Taking them from
+            # npm instead would pull 167 packages, a second pin of Pi, and an
+            # esbuild that does not build in the sandbox. The symlink is
+            # gitignored and tsconfig.json maps the module onto it.
+            #
+            # `npm install --package-lock-only` still drops its install-state
+            # marker at node_modules/.package-lock.json once that directory
+            # exists. It is a regular file, so the link script reads it as
+            # something a person put there and refuses to touch it, printing a
+            # refusal on every shell entry. Nix owns this tree, so the marker
+            # describes nothing. Drop it before linking.
+            shellHook = ''
+              rm -f node_modules/.package-lock.json
+              linkNodeModulesHook >&2
+              ln -sfn ${pkgs.pi-coding-agent}/lib/node_modules/pi-monorepo .pi-types
+              echo "pi-config dev shell ready" >&2
+            '';
           };
         }
       );
