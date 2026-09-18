@@ -18,7 +18,8 @@
     "git:github.com/code-yeongyu/pi-ast-grep",
     "git:github.com/tmustier/pi-queue-steer",
     "npm:pi-worktrunk",
-    "npm:pi-better-edit"
+    "npm:pi-better-edit",
+    "npm:pi-model-fallback-alias"
   ],
   "subagents": {
     "defaultThinking": "medium",

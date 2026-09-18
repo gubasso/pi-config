@@ -1,0 +1,10 @@
+{
+  "sidecars": [
+    {
+      "path": ".pi/agent/model-alias.json",
+      "class": "copy",
+      "sensitive": false,
+      "runtimeWrites": false
+    }
+  ]
+}

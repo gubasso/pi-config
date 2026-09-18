@@ -1,0 +1,13 @@
+{
+  "$comment": "omp built-in roles. Nested alias/* targets flatten at load. Append a second provider/model on a leaf role (default, smol, slow, vision) when that model is authenticated.",
+  "default": ["xai/grok-4.6"],
+  "smol": ["xai/grok-4.6"],
+  "slow": ["xai/grok-4.6"],
+  "vision": ["xai/grok-4.6"],
+  "tiny": ["alias/smol"],
+  "task": ["alias/smol"],
+  "commit": ["alias/smol"],
+  "plan": ["alias/slow"],
+  "designer": ["alias/slow"],
+  "advisor": ["alias/slow"]
+}

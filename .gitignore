@@ -10,6 +10,7 @@
 /home/.pi/agent/trust.json
 /home/.pi/agent/models-store.json
 /home/.pi/agent/sessions/
+/home/.pi/agent/state/
 /home/.pi/agent/npm/
 /home/.pi/agent/git/
 /home/.pi/agent/bin/
