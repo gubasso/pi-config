@@ -8,9 +8,22 @@ This working tree is the **source** of global Pi config, not the live agent dire
 - The upstream commit that was actually read is recorded in `docs/plugins/<plugin-name>/SPEC.md` as `Verified against upstream <sha>`, never in the pin. Bump it in a commit after reading the upstream diff.
 - This clone is SoT for every plugin config. A pin without a classified `sidecars.json` is unfinished.
 - Never commit `auth.json`, live-only sidecars, session transcripts, or install trees.
+- Every change to `scripts/pi_config/`, a justfile recipe, or a payload extension lands with its test. The gate runs them; see `## Tests` below.
 - This file is the clone's own `AGENTS.md`, and it is never deployed. The deployed global context is `home/.pi/agent/AGENTS.md`.
 
 See `SPEC.md`. Package selection: [docs/guides/package-selection.md](docs/guides/package-selection.md). Pin form: [docs/guides/package-pinning.md](docs/guides/package-pinning.md). LSP pin: [docs/guides/lsp.md](docs/guides/lsp.md).
+
+## Tests
+
+`just test` runs what a commit must pass, `just test-slow` what a push must pass. Both call pre-commit, which is the source of truth for when the suite runs.
+
+A test goes in `tests/<kind>/`, where the kind is `unit`, `integration`, `e2e`, or `meta`. It carries a cost (`fast` or `slow`) and a venue (`local`, `ci`, or both). A test naming neither never runs, so collection refuses it.
+
+pytest tests what the code does. bats tests what a person types. vitest tests the deployed TypeScript.
+
+Never write to the real `$HOME`, the live agent directory, or this repository's payload. Use `tmp_home` in pytest and `pi_setup` in bats.
+
+Contract: [SPEC.md](./SPEC.md) §16. Manual: [docs/guides/testing.md](./docs/guides/testing.md). Module layout: [SPEC.md](./SPEC.md) §15.
 
 ## Choosing a plugin
 

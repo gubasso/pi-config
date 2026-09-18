@@ -43,8 +43,10 @@ just deploy
 - `just doctor` — prove the source tree, plugin docs, sidecar classes, and the landing when dest exists
 - `just status` — show source, dest, live files, and each pin vs docs vs tree
 - `just check` — source-tree proofs (safe without a host landing)
+- `just test` — run the tests a commit must pass
+- `just test-slow` — run the tests a push must pass
 - `just hooks` — install the pre-commit, commit-msg, and pre-push hooks
 - `just lint` — run every gate over the whole tree
 - `just devshell-check` — prove the devShell supplies every tool a recipe or a hook calls
 
-Tooling and gates: [SPEC.md](./SPEC.md) §14.
+Tooling and gates: [SPEC.md](./SPEC.md) §14. Module layout: §15. Tests: §16 and [docs/guides/testing.md](./docs/guides/testing.md).

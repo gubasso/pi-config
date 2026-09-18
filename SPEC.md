@@ -106,20 +106,36 @@ pi-config/                          # source tree (clone lives anywhere)
 ├── README.md
 ├── AGENTS.md                       # clone-only rules; NOT deployed
 ├── .gitignore
-├── justfile                        # deploy / doctor / status / check
-├── scripts/pi_config.py            # the engine; not deployed
-├── package.json                    # private; optional pi manifest
+├── justfile                        # recipe names; the logic is in scripts/
+├── package.json                    # private; pi manifest plus devDependencies
+├── package-lock.json               # the JavaScript pin; Nix builds from it
+├── .npmrc                          # npm writes the lockfile, never the tree
 ├── tsconfig.json                   # for local TypeScript extensions
+├── vitest.config.ts                # the TypeScript half of the suite
+├── pytest.ini                      # the Python half, and the marker list
+├── pyrightconfig.json
 ├── flake.nix                       # devShell: every tool a recipe or hook calls
 ├── flake.lock
 ├── .envrc                          # direnv enters that devShell
 ├── .pre-commit-config.yaml         # the gates; see §14
-├── dprint.json                     # formatter of record for markdown and JSON
+├── dprint.json                     # formatter of record for md, JSON, and ts
 ├── .markdownlint-cli2.jsonc
 ├── .editorconfig
 ├── committed.toml                  # commit message content rules
 ├── ruff.toml
 ├── lychee.toml
+│
+├── scripts/                        # machinery; see §15. Not deployed.
+│   ├── run-tests.sh                # the one entry point every gate calls
+│   └── pi_config/                  # the engine, one module per concern
+│
+├── tests/                          # see §16. Not deployed.
+│   ├── conftest.py
+│   ├── helpers/                    # fixtures, tag gates, a stub `pi`
+│   ├── unit/                       # one function, no host state
+│   ├── integration/                # several modules, real files in tmp_path
+│   ├── e2e/                        # *.bats over the justfile recipes
+│   └── meta/                       # invariants of this source tree
 │
 ├── docs/
 │   ├── guides/                     # operator manuals; not deployed
@@ -528,7 +544,7 @@ Pi loads global `AGENTS.md` from the live agent directory **and** from the proje
 
 ## 14. Development environment
 
-`flake.nix` and `.envrc` are the source of truth for every tool a recipe or a hook calls by name, and for every language server the agent uses on this tree. `.pre-commit-config.yaml` is the source of truth for the gates themselves. Nix owns the runtimes and those servers; pre-commit owns the hooks. Do not add a language server for a language this repository does not contain.
+`flake.nix` and `.envrc` are the source of truth for every tool a recipe or a hook calls by name, and for every language server the agent uses on this tree. JavaScript is the one indirection: Nix builds `node_modules` from `package-lock.json` through `importNpmLock`, so the lockfile is the pin and the flake is still what supplies the tool. No test runner is ever installed by hand. `.pre-commit-config.yaml` is the source of truth for the gates themselves. Nix owns the runtimes and those servers; pre-commit owns the hooks. Do not add a language server for a language this repository does not contain.
 
 ### Enter the shell
 
@@ -542,11 +558,11 @@ This includes `git commit`. Most gates run `language: system` and resolve their 
 
 ### Gates
 
-| Stage        | What runs                                                                   |
-| ------------ | --------------------------------------------------------------------------- |
-| `pre-commit` | formatting, linting, staged-diff secrets, and `just check`                  |
-| `commit-msg` | `committed`, over `committed.toml`                                          |
-| `pre-push`   | `gitleaks` over the whole history, `lychee` over the markdown, `just check` |
+| Stage        | What runs                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `pre-commit` | formatting, linting, types, staged-diff secrets, `just check`, and the `fast` tests           |
+| `commit-msg` | `committed`, over `committed.toml`                                                            |
+| `pre-push`   | `gitleaks` over the whole history, `lychee` over the markdown, `just check`, the `slow` tests |
 
 `just check` is the repository's own contract, and a hook calls it. It refuses a tracked secret, an uncovered `.gitignore` line, a pin without its `docs/plugins/<name>/` set, and an unclassified sidecar. `just lint` runs every gate over the whole tree by hand.
 
@@ -566,7 +582,108 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 
 ---
 
-## 15. Anti-patterns
+## 15. Scripts
+
+`scripts/` is machinery. Nothing in it is deployed, and the justfile holds recipe names rather than logic, so a reader who wants to know what `just deploy` does opens one Python module rather than three hundred lines of embedded bash.
+
+### The engine
+
+```text
+scripts/
+├── run-tests.sh                 # the one entry point every gate calls
+└── pi_config/
+    ├── __init__.py              # re-exports every public name
+    ├── __main__.py              # python3 -m pi_config <verb> SRC DEST
+    ├── paths.py                 # where a path is, and whether it may be
+    ├── fsx.py                   # filesystem primitives, hardlinks included
+    ├── gitx.py                  # the three questions this engine asks git
+    ├── pins.py                  # reading the `packages` array
+    ├── manifest.py              # what a run landed, recorded as it lands
+    ├── sidecars.py              # what a sidecar declaration means
+    ├── prune.py                 # removing, and refusing to remove
+    ├── status.py                # what the operator sees
+    ├── landing.py               # putting a classified sidecar in place
+    ├── trees.py                 # install-tree convergence via `pi remove`
+    ├── deploy.py                # the landing orchestration
+    ├── doctor.py                # the proofs
+    └── check.py                 # the source-tree contract
+```
+
+### Rules
+
+Modules import downward only. A module may import from a strictly lower layer and never from its own or a higher one, which makes a cycle impossible by construction rather than by review.
+
+| Layer | Modules                       |
+| ----- | ----------------------------- |
+| 0     | `paths`, `fsx`, `gitx`        |
+| 1     | `pins`, `manifest`            |
+| 2     | `sidecars`, `prune`, `status` |
+| 3     | `landing`, `trees`            |
+| 4     | `deploy`, `doctor`            |
+| 5     | `check`                       |
+| 6     | `__main__`                    |
+
+One behavior has one implementation. `store_owned` lived three times across two languages before this, which meant three chances to get the Home Manager refusal wrong.
+
+A module over 300 lines wants splitting. Raise that number deliberately, in a commit that says why.
+
+The package re-exports every public name, so a caller writes `pi_config.converge` without knowing which module grew it.
+
+`tests/meta/test_architecture.py` enforces all of it: the layering, the absence of cycles, the size budget, a test module for each module, and the facade.
+
+### What stays in shell
+
+`scripts/run-tests.sh` orchestrates three external test runners. That is shell's job, and it is the only shell this tree authors besides the bats files and `.envrc`.
+
+A TypeScript extension is one file. `copy_dir_files` copies one level, because Pi discovers an extension at the top of its directory, so a subdirectory under `home/.pi/agent/extensions/` would land nowhere.
+
+---
+
+## 16. Tests
+
+Every change to `scripts/pi_config/`, to a justfile recipe, or to a payload extension lands with its test. A pre-commit hook is the source of truth for when the suite runs, and `just test` calls that hook rather than the runner.
+
+### Three axes
+
+| Axis  | Values                               | Carried by                        |
+| ----- | ------------------------------------ | --------------------------------- |
+| kind  | `unit`, `integration`, `e2e`, `meta` | the directory under `tests/`      |
+| cost  | `fast`, `slow`                       | a marker, a file tag, or a helper |
+| venue | `local`, `ci`                        | the same three places             |
+
+`fast` runs at pre-commit. `slow` runs at pre-push. `local` means the test needs this machine: the real `pi` binary, the network, or a landed destination. `ci` means it runs anywhere the devShell runs. Most tests carry both. A test that names neither a cost nor a venue never runs, so collection refuses it.
+
+`kind` comes from the path, so no test repeats where it lives.
+
+### One runner per language
+
+| Runner | Tests                   | Tags through                          |
+| ------ | ----------------------- | ------------------------------------- |
+| pytest | what the code does      | markers, selected with `-m`           |
+| bats   | what a person types     | `# bats file_tags=`, `--filter-tags`  |
+| vitest | the deployed TypeScript | `tagged()` in `tests/helpers/tags.ts` |
+
+`scripts/run-tests.sh` translates the cost and venue into each runner's own selector and runs all three, reporting every failure rather than stopping at the first.
+
+### Isolation
+
+No test may write to the real `$HOME` or the live agent directory. `tmp_home` and `pi_setup` both refuse rather than trust that a caller set the environment, and both capture the real home before replacing it.
+
+A test detaches from git before it runs. A hook runs inside `git commit`, which exports `GIT_INDEX_FILE` and `GIT_DIR`; a `git add` in a sandbox would otherwise write the real index.
+
+### Running them
+
+- `just test` runs the pre-commit budget.
+- `just test-slow` runs the pre-push budget.
+- `just test-all` runs both.
+
+Running one slice while you write it is `scripts/run-tests.sh fast unit`, or `pytest tests/unit -k veto`. That is debugging, not the gate.
+
+Full manual: [docs/guides/testing.md](./docs/guides/testing.md).
+
+---
+
+## 17. Anti-patterns
 
 - Home Manager `home.file` or a settings seed into the agent dir
 - Exporting `PI_CODING_AGENT_DIR` at this clone, including at `home/.pi/agent` inside it
@@ -593,11 +710,19 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Hand-writing a prune rule for one filename into `doctor` instead of letting the manifest own extent
 - Recomputing the deploy manifest by re-enumerating the payload instead of recording what deploy landed
 - Committing `.pi-config-manifest.json`, which is per-host state at the dest
+- Landing a change to `scripts/pi_config/`, a justfile recipe, or a payload extension with no test
+- Running the suite outside the gate and calling that proof
+- A test that writes to the real `$HOME`, the live agent directory, or this repository's own payload
+- A test that runs `git` without first dropping the `GIT_DIR` and `GIT_INDEX_FILE` a hook inherits
+- Tagging a slow test `fast` to get it past pre-commit
+- A second implementation of a rule that already has one
+- Raising the module size budget instead of splitting the module
+- `npm install` without `--package-lock-only`, which fights the node_modules Nix built
 - Passing `--no-verify`
 
 ---
 
-## 16. Decision log
+## 18. Decision log
 
 - Home Manager is not SoT for the live agent directory.
 - This repository is source, not the live agent directory.
@@ -624,3 +749,11 @@ If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-w
 - Install-tree convergence runs `pi remove` last, and treats exit 1 with `No matching package found` as success once the dependency is verified gone.
 - Supersedes the repo-root-layout entry above: the payload lives under `home/`, a literal `$HOME` mirror, and the root is machinery only. A payload's repo path states its own destination, so deploy is still a copy or a symlink of that path. This also ends the `AGENTS.md` double injection structurally, because a cwd lookup at the clone root now finds the clone's own rules and never the payload. `AGENTS.override.md` is deleted.
 - A sidecar `path` in `docs/plugins/<name>/sidecars.json` is relative to `$HOME` and is tracked at `home/<path>`. The `root` key is gone: a path under `.pi/agent/` follows `PI_CODING_AGENT_DIR`, and anything else lands under `$HOME`.
+- `.pre-commit-config.yaml` owns when the tests run. The cost tag on a test picks the stage: `fast` at pre-commit, `slow` at pre-push. `just test` calls the hook rather than the runner, so there is one answer to when a test runs.
+- Three axes classify every test: kind from the directory, cost and venue written on the test. A test naming neither a cost nor a venue is a collection error, because it would otherwise never run and never say so.
+- pytest tests what the code does, bats tests what a person types, vitest tests the deployed TypeScript. The bats tests are black-box, which is what let the engine move out of the justfile without anyone having to trust that the move was faithful.
+- vitest comes from `package-lock.json`, built by Nix through `importNpmLock`. It is not in nixpkgs, and letting npm own `node_modules` would put a tool a hook calls outside the flake.
+- `tsc` resolves the payload extension's Pi types from the same nixpkgs pin that supplies the binary, symlinked at `.pi-types`. Taking them from npm would add a second pin of Pi that can drift from it.
+- Python owns the engine and the justfile holds recipe names. The landing contract had two implementations in two languages joined by a temp file, and `store_owned` existed three times.
+- `scripts/pi_config/` modules import downward only, with a 300-line budget per module. Both are enforced by `tests/meta/test_architecture.py` rather than by review.
+- The run manifest is a dictionary in the process that fills it. An empty landing set is fatal, because converge would otherwise read every path in the previous manifest as stale.
