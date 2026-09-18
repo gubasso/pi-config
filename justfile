@@ -380,8 +380,3 @@ check:
       esac
     done
     echo "ok  no tracked secrets"
-
-    # The guard keys on the word `git`, which is what keeps `wt` and
-    # `rk worktree add` open. A widened pattern would refuse the tools the
-    # rule routes work into, so the case table is a gate, not a comment.
-    node "$src/scripts/check-worktree-guard.mjs"

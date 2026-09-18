@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
     "paths": {
       "@earendil-works/pi-coding-agent": ["./.pi-types/dist/index.d.ts"]
     }
