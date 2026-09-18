@@ -945,7 +945,15 @@ RUNTIME_OWNED_DIRS = {
     "tools",
     "web-search-cache",
     "missions",
+    "pending-asks",
+    "extension-state",
 }
+
+# keybindings.json is in RUNTIME_OWNED_NAMES because Pi writes it when this
+# repo does not track it. Deploy does land it when a source exists, so a stale
+# row for it must stay prunable, or removing that source wedges every later
+# deploy. The scan still stays quiet about an untracked one.
+PRUNE_VETO_NAMES = RUNTIME_OWNED_NAMES - {"keybindings.json"}
 
 
 def runtime_owned(target: str, roots: list[str]) -> bool:
@@ -959,14 +967,20 @@ def runtime_owned(target: str, roots: list[str]) -> bool:
     every prune.
     """
     name = os.path.basename(target)
-    if name in RUNTIME_OWNED_NAMES or name.endswith(".log"):
+    if name in PRUNE_VETO_NAMES or name.endswith(".log"):
         return True
-    absolute = os.path.abspath(target)
-    for root in roots:
-        prefix = os.path.abspath(root) + os.sep
-        if absolute.startswith(prefix):
-            rel = absolute[len(prefix) :]
-            return any(part in RUNTIME_OWNED_DIRS for part in rel.split(os.sep))
+    # Both spellings. A lexical-only check misses an in-root symlink such as
+    # dest/legacy -> dest/sessions, which would carry a stale row into a
+    # transcript while staying physically inside the landing root.
+    for candidate in (os.path.abspath(target), entry_path(target)):
+        for root in roots:
+            prefix = os.path.abspath(root) + os.sep
+            real_prefix = os.path.realpath(root) + os.sep
+            for base in (prefix, real_prefix):
+                if candidate.startswith(base):
+                    rel = candidate[len(base) :]
+                    if any(part in RUNTIME_OWNED_DIRS for part in rel.split(os.sep)):
+                        return True
     return False
 
 
@@ -1227,7 +1241,7 @@ def converge_trees(dest: str, pins: list[dict[str, str]]) -> None:
 
 def usage() -> None:
     raise SystemExit(
-        "usage: package-pins.py emit|prove-docs|prove-sidecars|land-sidecars|converge|converge-trees|prove-manifest|status|note-trees SRC DEST"
+        "usage: package-pins.py emit|prove-docs|prove-sidecars|land-sidecars|prove-roots|converge|converge-trees|prove-manifest|status|note-trees SRC DEST"
     )
 
 
@@ -1258,6 +1272,10 @@ def main() -> None:
         return
     if mode == "land-sidecars":
         land_sidecars(src, dest, sidecars)
+        return
+    if mode == "prove-roots":
+        for root in landing_roots(dest):
+            print(f"ok  landing root {root}")
         return
     if mode == "converge":
         converge(src, dest, sidecars)

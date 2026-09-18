@@ -59,6 +59,11 @@ deploy:
       return 1
     }
 
+    # Before anything lands. A symlinked landing root would silently redirect
+    # every copy and every symlink below it, and a guard that only ran at prune
+    # time would fire after the damage.
+    python3 "$src/scripts/package-pins.py" prove-roots "$src" "$dest"
+
     mkdir -p "$dest"
     dest="$(cd "$dest" && pwd -P)"
 
