@@ -93,10 +93,11 @@ repos:
     hooks:
       - id: dprint
         name: dprint fmt
-        entry: dprint fmt
+        entry: dprint fmt --allow-no-files
         language: system
         types_or: [markdown, json]
         files: '\.(md|json|jsonc)$'
+        exclude: *runtime_owned
 
       - id: nixfmt
         name: nixfmt

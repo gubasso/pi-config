@@ -122,6 +122,21 @@ class TestFormatterAndFixerAgree:
         normalise = lambda s: s.replace("**", "*").replace(".*", "*")  # noqa: E731
         assert {normalise(e) for e in dprint} == {normalise(e) for e in anchor}
 
+    def test_dprint_hook_allows_an_empty_or_excluded_batch(
+        self, repo_root: pathlib.Path
+    ) -> None:
+        config = yaml.safe_load((repo_root / ".pre-commit-config.yaml").read_text())
+        hooks = [
+            hook
+            for repo in config["repos"]
+            for hook in repo["hooks"]
+            if hook.get("id") == "dprint"
+        ]
+        assert len(hooks) == 1
+        hook = hooks[0]
+        assert "--allow-no-files" in hook["entry"].split()
+        assert hook["exclude"].startswith("^home/")
+
 
 class TestDevshellCheckMatchesTheFlake:
     def test_every_tool_the_loop_probes_is_in_the_flake(

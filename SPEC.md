@@ -576,7 +576,9 @@ dprint is the formatter of record for markdown and JSON, with `textWrap: "never"
 
 `dprint.json` excludes the JSON that Pi writes at runtime, all of it under `home/.pi/agent/`: `settings.json`, `keybindings.json`, `pi-plan-mode.json`, `99extensions.json`, `intercom/config.json`, and `extensions/**/config.json`. Two reasons. Pi rewrites those files itself, so a formatter fights the runtime on every write. A formatter also replaces a file atomically, which breaks the hardlink a `followsSymlinks: false` sidecar depends on (§9).
 
-The three whitespace fixers in `.pre-commit-config.yaml` carry the same exclude list, under the YAML anchor `runtime_owned`, anchored on the same `home/.pi/agent/` prefix. Pi writes `settings.json` with no trailing newline. A fixer that adds one is undone on Pi's next write, and the two trade that byte forever. Add a new runtime-written file to both lists at once.
+The three whitespace fixers and the dprint hook in `.pre-commit-config.yaml` carry the same exclude list, under the YAML anchor `runtime_owned`, anchored on the same `home/.pi/agent/` prefix. Pi writes `settings.json` with no trailing newline. A fixer that adds one is undone on Pi's next write, and the two trade that byte forever. That is the only byte dprint's json plugin disagrees on: indent, key order, and one-line nested objects already match. `check-json5` still parses those files; they are not unvalidated. Add a new runtime-written file to both lists at once.
+
+The dprint hook runs `dprint fmt --allow-no-files`. Without the flag, dprint 0.57 exits 14 when every path it received is excluded by `dprint.json`, which is what happens if a commit batch is only runtime-owned JSON.
 
 If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-way-syncs the file and restores the hardlink.
 
