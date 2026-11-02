@@ -48,13 +48,24 @@ repos:
       # no trailing newline; a fixer that adds one is undone on Pi's next
       # write, and the pair trade the same byte forever. The exclude list is
       # the one in dprint.json.
+      #
+      # They also skip the lock files that nix and npm write. A generated file
+      # follows its generator: the dev environment rule of nix-secrets,
+      # home/apps/claude-session/rules/dev-environment.md. The negative `files`
+      # pattern keeps them out
+      # beside the shared runtime exclude, which a drift test pins to
+      # dprint.json. typos and editorconfig-checker skip the lock files in
+      # _typos.toml and .editorconfig-checker.json.
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md] # keep two-space hard breaks
+        files: &not_a_lock_file '^(?!(flake\.lock|package-lock\.json)$)'
         exclude: &runtime_owned '^home/\.pi/agent/(settings\.json|keybindings\.json|pi-plan-mode\.json|99extensions\.json|intercom/config\.json|extensions/.*/config\.json)$'
       - id: end-of-file-fixer
+        files: *not_a_lock_file
         exclude: *runtime_owned
       - id: mixed-line-ending
         args: [--fix=lf]
+        files: *not_a_lock_file
         exclude: *runtime_owned
       - id: check-added-large-files
         args: ['--maxkb=1024']

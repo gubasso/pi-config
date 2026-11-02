@@ -1,0 +1,6 @@
+{
+  "Exclude": [
+    "^flake\\.lock$",
+    "^package-lock\\.json$"
+  ]
+}

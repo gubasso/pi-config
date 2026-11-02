@@ -582,6 +582,8 @@ The dprint hook runs `dprint fmt --allow-no-files`. Without the flag, dprint 0.5
 
 If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-way-syncs the file and restores the hardlink.
 
+nix writes `flake.lock` and npm writes `package-lock.json`. A generated file follows its generator, so no check rewrites or judges them. `dprint.json` excludes `package-lock.json`, and dprint does not format `flake.lock`. The three whitespace fixers skip both through a negative `files` pattern, under the YAML anchor `not_a_lock_file`, beside the `runtime_owned` exclude. typos skips both in `_typos.toml`, and editorconfig-checker in `.editorconfig-checker.json`, so a direct run of either tool agrees with its hook. The reading hooks keep them: `check-json5`, the secret scans, and the merge-conflict check.
+
 ---
 
 ## 15. Scripts

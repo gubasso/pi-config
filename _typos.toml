@@ -1,0 +1,6 @@
+# nix writes flake.lock and npm writes package-lock.json. A generated file
+# follows its generator, so typos skips them (the dev environment rule of
+# nix-secrets). The hook passes
+# --force-exclude, so this list also holds there.
+[files]
+extend-exclude = ["flake.lock", "package-lock.json"]
