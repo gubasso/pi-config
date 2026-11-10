@@ -31,10 +31,11 @@ TESTS = ROOT / "tests"
 # captures the same value for the same reason.
 REAL_HOME = pathlib.Path(os.path.expanduser("~")).resolve()
 
-# The engine, imported rather than shelled out to. The justfile puts the same
-# directory on PYTHONPATH for `python3 -m pi_config`, so a test drives the
-# module a recipe runs and not a copy of it. pyrightconfig.json repeats the
-# path for the editor, which cannot see this line.
+# The engine, imported rather than shelled out to. uv installs scripts/ as an
+# editable package for `uv run python -m pi_config`, and the path here makes
+# sure a test drives the module of this tree and not a copy of it.
+# pyrightconfig.json repeats the path for the editor, which cannot see this
+# line.
 sys.path.insert(0, str(ROOT / "scripts"))
 
 KINDS = frozenset({"unit", "integration", "e2e", "meta"})

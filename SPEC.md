@@ -544,17 +544,17 @@ Pi loads global `AGENTS.md` from the live agent directory **and** from the proje
 
 ## 14. Development environment
 
-`flake.nix` and `.envrc` are the source of truth for every tool a recipe or a hook calls by name, and for every language server the agent uses on this tree. JavaScript is the one indirection: Nix builds `node_modules` from `package-lock.json` through `importNpmLock`, so the lockfile is the pin and the flake is still what supplies the tool. No test runner is ever installed by hand. `.pre-commit-config.yaml` is the source of truth for the gates themselves. Nix owns the runtimes and those servers; pre-commit owns the hooks. Do not add a language server for a language this repository does not contain.
+Each dependency has one owner, the most specific file that declares it natively (the dev environment rule of nix-secrets, `home/apps/claude-session/rules/dev-environment.md`). `pyproject.toml` and `uv.lock` own the Python package `pi_config` and its dev tools: pytest, pyyaml, ruff, and pyright, whose `ruff server` and `pyright-langserver` the editor uses. The devShell syncs them into `.venv` and puts it on PATH. `package.json` and `package-lock.json` own the TypeScript tools, vitest and tsc, and Nix builds `node_modules` from the lockfile through `importNpmLock`. `.pre-commit-config.yaml` owns each hook tool that pre-commit can build an environment for, pinned by `rev`. `flake.nix` owns the toolchains, the runners, and each tool that no owner above can declare, such as dprint, statix, lychee, and the language servers the agent uses on this tree. A flake holds no language library. No test runner is ever installed by hand. Do not add a language server for a language this repository does not contain.
 
 ### Enter the shell
 
 1. `direnv allow` once per clone. After that, `cd` into the clone enters the devShell.
 2. `just hooks` to install the git hooks for every stage the config declares.
-3. `just devshell-check` proves the shell supplies every tool. A missing tool is a missing line in `flake.nix`, never a reason to install it into the home profile.
+3. `just devshell-check` proves that every tool is on PATH. A missing tool is a missing line in its owner, never a reason to install it into the home profile.
 
 A non-interactive context — CI, an agent, an editor task, `bash -c` — does not fire the direnv hook and must wrap the command: `nix develop --command just deploy`.
 
-This includes `git commit`. Most gates run `language: system` and resolve their binary off PATH, so a commit from a plain shell fails with `Executable not found`. Commit from the devShell, or wrap it: `nix develop --command git commit`. Never pass `--no-verify`.
+This includes `git commit`. The gates that keep `language: system` resolve their binary off PATH, so a commit from a plain shell fails with `Executable not found`. Commit from the devShell, or wrap it: `nix develop --command git commit`. Never pass `--no-verify`.
 
 ### Gates
 
@@ -568,7 +568,7 @@ This includes `git commit`. Most gates run `language: system` and resolve their 
 
 The Conventional Commits grammar belongs to the configured global `commit-msg` hook, not to this repository. `committed` adds only what that hook leaves alone: subject and body length, lower case after the colon, and no trailing period.
 
-A hook whose upstream language is rust, go, or python with a prebuilt wheel runs `language: system` and takes its binary from the devShell. Such a wheel ships a dynamically linked binary whose ELF interpreter `/lib64/ld-linux-x86-64.so.2` does not exist on a Nix host. The `rev` pins the hook definition; `flake.nix` pins the binary.
+A hook whose upstream publishes it in a language that pre-commit builds runs in that environment, pinned by `rev`. A hook that keeps `language: system`, or an upstream `-system` id, carries an `# owner:` comment directly above it that names its owner, its class, and its reason. A NixOS host runs a dynamically linked hook binary through nix-ld.
 
 ### Who owns a file's bytes
 
@@ -597,7 +597,7 @@ scripts/
 ├── run-tests.sh                 # the one entry point every gate calls
 └── pi_config/
     ├── __init__.py              # re-exports every public name
-    ├── __main__.py              # python3 -m pi_config <verb> SRC DEST
+    ├── __main__.py              # uv run python -m pi_config <verb> SRC DEST
     ├── paths.py                 # where a path is, and whether it may be
     ├── fsx.py                   # filesystem primitives, hardlinks included
     ├── gitx.py                  # the three questions this engine asks git
@@ -682,7 +682,7 @@ A test detaches from git before it runs. A hook runs inside `git commit`, which 
 - `just test-slow` runs the pre-push budget.
 - `just test-all` runs both.
 
-Running one slice while you write it is `scripts/run-tests.sh fast unit`, or `pytest tests/unit -k veto`. That is debugging, not the gate.
+Running one slice while you write it is `scripts/run-tests.sh fast unit`, or `uv run pytest tests/unit -k veto`. That is debugging, not the gate.
 
 Full manual: [docs/guides/testing.md](./docs/guides/testing.md).
 

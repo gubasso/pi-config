@@ -47,6 +47,6 @@ just deploy
 - `just test-slow` — run the tests a push must pass
 - `just hooks` — install the pre-commit, commit-msg, and pre-push hooks
 - `just lint` — run every gate over the whole tree
-- `just devshell-check` — prove the devShell supplies every tool a recipe or a hook calls
+- `just devshell-check` — prove that the devShell, uv.lock, and package-lock.json put every tool a recipe, a hook, or a language server calls on PATH
 
 Tooling and gates: [SPEC.md](./SPEC.md) §14. Module layout: §15. Tests: §16 and [docs/guides/testing.md](./docs/guides/testing.md).

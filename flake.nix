@@ -29,28 +29,29 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          # The one Python of the shell. pyproject.toml bounds it with
+          # requires-python.
+          python = pkgs.python3;
         in
         {
           default = pkgs.mkShell {
-            # Every package here backs a recipe, a `language: system` hook,
-            # or a language server the agent uses on this tree. A system
-            # hook resolves off PATH and gets no environment of its own, so
-            # this list is the only thing that can supply it. `just
-            # devshell-check` is the executable form of that claim.
+            # Each dependency has one owner, the most specific file that
+            # declares it natively. pyproject.toml and uv.lock own the Python
+            # package and its dev tools, package.json and package-lock.json
+            # own the TypeScript tools, and .pre-commit-config.yaml owns each
+            # hook tool that pre-commit can build. This list holds the
+            # toolchains, the runners, and each tool that no owner above can
+            # declare, such as the language servers the agent uses on this
+            # tree. `just devshell-check` makes sure each tool is on PATH.
             packages = with pkgs; [
               # The landing contract: deploy, doctor, status, check.
               just
               # The gate runner.
               pre-commit
-              # scripts/pi_config/, the doctor's JSON probes, and the
-              # Python half of the test suite. pytest rides along with the
-              # interpreter so no test runner reaches PATH from outside Nix.
-              (python3.withPackages (ps: [
-                ps.pytest
-                # tests/meta reads .pre-commit-config.yaml to prove the
-                # formatter and the whitespace fixers skip the same files.
-                ps.pyyaml
-              ]))
+              # The interpreter and the manager of the Python package. The
+              # shellHook syncs uv.lock into .venv.
+              python
+              uv
               # markdownlint-cli2 runs on this node through
               # `language_version: system`. pre-commit's own nodeenv
               # downloads a generic-glibc node whose ELF interpreter
@@ -67,33 +68,22 @@
                 p.bats-assert
                 p.bats-file
               ]))
-              # scripts/run-tests.sh and tests/helpers/*.bash are the only
-              # shell this tree authors. Nothing linted them before.
-              shellcheck
-              shfmt
-              # `tsc --noEmit` over tsconfig.json, for the payload
-              # extensions and the vitest suite.
-              typescript
-              # The formatter of record for markdown, JSON, and TypeScript.
+              # The formatter of record for markdown, JSON, and TypeScript,
+              # which has no hook in a language that pre-commit builds.
               # dprint.json lists what it must not touch.
               dprint
-              # scripts/pi_config/ and tests/**/*.py (CLI + `ruff server`).
-              ruff
-              typos
-              committed
-              gitleaks
-              ripsecrets
+              # The link check of the pre-push stage (lychee-system).
               lychee
-              editorconfig-checker
-              # RFC 166 formatter, plus the two nix linters the hooks call.
+              # The RFC 166 formatter, which `nix fmt` and the nixfmt hook
+              # share, and statix, which has no hook that pre-commit builds.
               nixfmt
               statix
-              deadnix
               jq
               # Language servers pi-lsp-client probes on PATH for the
               # languages this repository actually contains. Do not add a
               # server for a language that is not here.
-              pyright # .py types (`pyright-langserver`)
+              # .py types: `pyright-langserver` comes from the dev group of
+              # pyproject.toml, in .venv.
               nixd # .nix
               yaml-language-server # .pre-commit-config.yaml
               bash-language-server # .envrc and justfile recipes
@@ -143,7 +133,20 @@
             # something a person put there and refuses to touch it, printing a
             # refusal on every shell entry. Nix owns this tree, so the marker
             # describes nothing. Drop it before linking.
+            #
+            # The Python half hands the interpreter of the flake to uv,
+            # forbids interpreter downloads, installs uv.lock into .venv as
+            # it is, and puts .venv/bin first on PATH. After a change of
+            # pyproject.toml, run `uv lock`, then `direnv reload`.
             shellHook = ''
+              root="$(git rev-parse --show-toplevel)"
+              export UV_PYTHON="${python}/bin/python3"
+              export UV_PYTHON_DOWNLOADS=never
+              export UV_PROJECT_ENVIRONMENT="$root/.venv"
+              uv sync --frozen --quiet --project "$root" >&2 \
+                || echo "uv sync failed: after a change of pyproject.toml, run uv lock" >&2
+              export VIRTUAL_ENV="$root/.venv"
+              export PATH="$root/.venv/bin:$PATH"
               rm -f node_modules/.package-lock.json
               linkNodeModulesHook >&2
               ln -sfn ${pkgs.pi-coding-agent}/lib/node_modules/pi-monorepo .pi-types

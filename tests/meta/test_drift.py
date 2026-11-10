@@ -142,30 +142,38 @@ class TestDevshellCheckMatchesTheFlake:
     def test_every_tool_the_loop_probes_is_in_the_flake(
         self, repo_root: pathlib.Path
     ) -> None:
-        """`just devshell-check` is the executable form of the flake's claim.
+        """`just devshell-check` is the executable form of the owners' claim.
 
-        A tool in the loop and not in the flake makes the recipe fail on a
-        clean machine, which is exactly the report it exists to give. A tool
-        in the flake and not in the loop is never proved present.
+        A tool in the loop and not in its owner makes the recipe fail on a
+        clean machine, which is exactly the report it exists to give. The
+        devShell owns most tools, uv.lock the Python tools, and
+        package-lock.json the TypeScript tools.
         """
         justfile = (repo_root / "justfile").read_text()
         loop = re.search(r"for t in (.*?); do", justfile, re.S)
         assert loop is not None
         probed = set(loop.group(1).replace("\\\n", " ").split())
 
-        flake = (repo_root / "flake.nix").read_text()
-
-        # A package's attribute name is not always its command name.
-        COMMANDS = {
-            "node": "nodejs",
-            "pytest": "python3.withPackages",
-            "tsc": "typescript",
-            "pyright-langserver": "pyright",
-            "vscode-json-language-server": "vscode-langservers-extracted",
-            "vitest": "importNpmLock",
+        # Each tool has one owner, so the probe looks for it in that file. A
+        # package's attribute name is not always its command name.
+        OWNERS = {
+            "node": ("flake.nix", "nodejs"),
+            "vscode-json-language-server": (
+                "flake.nix",
+                "vscode-langservers-extracted",
+            ),
+            "pytest": ("pyproject.toml", '"pytest'),
+            "ruff": ("pyproject.toml", '"ruff'),
+            "pyright-langserver": ("pyproject.toml", '"pyright'),
+            "tsc": ("package.json", '"typescript"'),
+            "vitest": ("package.json", '"vitest"'),
         }
-        missing = [tool for tool in probed if COMMANDS.get(tool, tool) not in flake]
-        assert missing == [], f"probed but not in flake.nix: {sorted(missing)}"
+        missing = []
+        for tool in sorted(probed):
+            owner, token = OWNERS.get(tool, ("flake.nix", tool))
+            if token not in (repo_root / owner).read_text():
+                missing.append(f"{tool} ({owner})")
+        assert missing == [], f"probed but not in its owner: {missing}"
 
 
 class TestPayloadIsDeployable:

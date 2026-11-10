@@ -5,7 +5,7 @@ ones the justfile's bash called to hand work back to Python, are gone with
 the bash that called them.
 
 No `if __name__ == "__main__"` guard. A package's __main__ module runs only
-under `python3 -m pi_config`, and the guard once hid a real failure: a
+under `python -m pi_config`, and the guard once hid a real failure: a
 refactor dropped it, every recipe then loaded the module and exited zero
 without doing anything, and only the end-to-end tests noticed.
 """
@@ -27,7 +27,7 @@ VERBS = ("deploy", "doctor", "check", "status", "emit")
 
 
 def usage() -> None:
-    raise SystemExit(f"usage: python3 -m pi_config {'|'.join(VERBS)} SRC DEST")
+    raise SystemExit(f"usage: uv run python -m pi_config {'|'.join(VERBS)} SRC DEST")
 
 
 def main() -> None:

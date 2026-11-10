@@ -22,7 +22,7 @@ Resolver (`src/lsp/config-loader.ts` `getConfigPaths`):
 
 Project config wins over user config over builtins. `disabled: true` removes a builtin. An entry without `command` and `extensions` is ignored except for `disabled`.
 
-Source `home/.pi/lsp-client.json` adds servers this tree needs that are not pi-lsp-client builtins: `jsonls` (`.json`/`.jsonc`), `taplo` (`.toml`), `marksman` (`.md`). `biome` is disabled so it cannot claim JSON (dprint owns format here). Other builtins stay. `pyright`, `ruff`, `nixd`, `yaml-language-server`, and `bash-language-server` are PATH probes from the flake, not entries here.
+Source `home/.pi/lsp-client.json` adds servers this tree needs that are not pi-lsp-client builtins: `jsonls` (`.json`/`.jsonc`), `taplo` (`.toml`), `marksman` (`.md`). `biome` is disabled so it cannot claim JSON (dprint owns format here). Other builtins stay. `pyright`, `ruff`, `nixd`, `yaml-language-server`, and `bash-language-server` are PATH probes, not entries here: pyright and ruff from the dev group of `pyproject.toml` in `.venv`, the others from the flake.
 
 Do not run `/lsp install`. Servers are PATH probes (`src/lsp/server-installation.ts`). Auto-install recipes stay unused.
 

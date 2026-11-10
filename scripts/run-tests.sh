@@ -101,7 +101,9 @@ cost_expr="${cost_expr//|/ or }"
 if has_tests "test_*.py"; then
   ran=$((ran + 1))
   set +e
-  pytest "$scope" -m "($cost_expr) and $venue"
+  # pyproject.toml owns pytest, so uv runs it, in the .venv that the
+  # devShell synced.
+  uv run --no-sync pytest "$scope" -m "($cost_expr) and $venue"
   status=$?
   set -e
   # 5 is "no tests collected", which a marker expression legitimately causes.

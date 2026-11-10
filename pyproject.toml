@@ -1,0 +1,30 @@
+# The Python package of this tree: the engine that the recipes run as
+# `uv run python -m pi_config`, under scripts/pi_config/. uv.lock pins it and
+# its dev tools, and the devShell syncs them into .venv.
+[project]
+name = "pi-config"
+version = "0.0.0"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  # The Python half of the suite, through scripts/run-tests.sh.
+  "pytest>=9,<10",
+  # tests/meta reads .pre-commit-config.yaml.
+  "pyyaml>=6,<7",
+  # The ruff hooks and `ruff server`, the language server of the editor.
+  "ruff>=0.16.8,<0.17",
+  # The pyright hook and the language server of the editor
+  # (`pyright-langserver`), so the project uses it outside pre-commit.
+  "pyright>=1.1.412,<2",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.11,<0.13"]
+build-backend = "uv_build"
+
+# The module lives in scripts/, not in the default src/.
+[tool.uv.build-backend]
+module-name = "pi_config"
+module-root = "scripts"

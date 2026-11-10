@@ -126,7 +126,7 @@ def prove_source(
 
     try:
         json.load(open(os.path.join(agent_src, "settings.json"), encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         fail("settings.json is not JSON")
     say("settings.json json")
 

@@ -2,13 +2,20 @@
   "name": "pi-config",
   "private": true,
   "type": "module",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "devDependencies": {
     "@types/node": "^24.13.5",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   },
   "pi": {
-    "extensions": ["./home/.pi/agent/extensions"],
-    "prompts": ["./home/.pi/agent/prompts"]
+    "extensions": [
+      "./home/.pi/agent/extensions"
+    ],
+    "prompts": [
+      "./home/.pi/agent/prompts"
+    ]
   }
 }

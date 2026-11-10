@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import subprocess
 
 import pytest
@@ -135,28 +136,21 @@ def test_the_bats_helper_detaches_from_git_before_anything_runs(
     assert unset < first_use
 
 
-def test_the_justfile_keeps_the_devshell_on_the_python_path(
+def test_every_recipe_runs_the_engine_through_uv(
     repo_root: pathlib.Path,
 ) -> None:
-    """The justfile adds `scripts/` to PYTHONPATH. It must not replace it.
+    """pyproject.toml owns the engine, so a recipe reaches it through uv.
 
-    The devshell puts every Nix Python package on PYTHONPATH, so a bare
-    assignment made `import yaml` fail inside `just test` while a bare
-    `pytest` in the same shell passed. The gate is the only path that runs
-    under `just`, which is exactly where the breakage hid.
+    A recipe that ran `python3 -m pi_config` needed scripts/ on PYTHONPATH
+    and took whatever python3 the caller's PATH held. `uv run` runs the
+    package that uv.lock installed into .venv.
     """
-    env = {**os.environ, "PYTHONPATH": "/sentinel/inherited"}
-    got = subprocess.run(
-        ["just", "--evaluate", "PYTHONPATH"],
-        cwd=repo_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
+    justfile = (repo_root / "justfile").read_text()
+    calls = re.findall(r"^\s+(.*-m pi_config\b.*)$", justfile, re.M)
 
-    assert got.split(":")[0] == str(repo_root / "scripts")
-    assert "/sentinel/inherited" in got.split(":")
+    assert calls, "no recipe runs the engine"
+    assert all(call.startswith("uv run python -m pi_config ") for call in calls)
+    assert "PYTHONPATH" not in justfile
 
 
 def test_the_payload_guard_notices_a_mutation_that_adds_no_path(

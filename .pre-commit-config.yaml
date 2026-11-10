@@ -27,11 +27,15 @@
 #                         gitignore coverage, every plugin sidecar classified.
 #   committed           : subject and body length, punctuation, case.
 #
-# Every hook whose upstream language is rust, go, or python-with-a-prebuilt
-# wheel runs `language: system` and takes its binary from the devShell. Those
-# wheels ship a dynamically linked binary whose ELF interpreter
-# /lib64/ld-linux-x86-64.so.2 does not exist on this host. The `rev` still
-# pins the hook definition; flake.nix pins the binary.
+# Who owns each tool: the most specific file that declares it natively (the
+# dev environment rule of nix-secrets,
+# home/apps/claude-session/rules/dev-environment.md). pre-commit owns each
+# hook tool that it can build an environment for, pinned by `rev`.
+# pyproject.toml and uv.lock own the Python tools, package.json the
+# TypeScript tools, and flake.nix the toolchains and each tool that no owner
+# above can declare. A hook that keeps `language: system`, or an upstream
+# `-system` id, names its owner, class, and reason in an `# owner:` comment
+# directly above it.
 #
 # Install every stage with `just hooks`.
 
@@ -92,7 +96,6 @@ repos:
     hooks:
       - id: editorconfig-checker
         alias: ec
-        language: system
         # end-of-file-fixer owns final-newline enforcement; do not double-gate.
         args: [-disable-insert-final-newline]
         # Markdown whitespace belongs to dprint, and .editorconfig opts *.md
@@ -102,6 +105,7 @@ repos:
   # --- Formatters and linters that resolve off PATH ---
   - repo: local
     hooks:
+      # owner: devshell (no-hook-language) upstream dprint publishes no hook in a language that pre-commit builds.
       - id: dprint
         name: dprint fmt
         entry: dprint fmt --allow-no-files
@@ -110,23 +114,21 @@ repos:
         files: '\.(md|json|jsonc)$'
         exclude: *runtime_owned
 
+      # owner: devshell (outside-caller) `nix fmt` runs the nixfmt that the flake publishes as its formatter, so the hook runs the same one.
       - id: nixfmt
         name: nixfmt
         entry: nixfmt
         language: system
         files: '\.nix$'
+      # owner: devshell (no-hook-language) statix has no hook in a language that pre-commit builds.
       - id: statix
         name: statix check
         entry: statix check
         language: system
         files: '\.nix$'
         pass_filenames: false
-      - id: deadnix
-        name: deadnix
-        entry: deadnix --fail
-        language: system
-        files: '\.nix$'
 
+      # owner: devshell (no-hook-language) just publishes no hook in a language that pre-commit builds.
       - id: just-fmt
         name: just --fmt --check
         entry: just --unstable --fmt --check
@@ -134,6 +136,7 @@ repos:
         files: '^justfile$'
         pass_filenames: false
 
+      # owner: devshell (no-hook-language) it runs a recipe of this repository.
       - id: pi-config-check
         name: pi-config source proofs
         entry: just check
@@ -142,42 +145,20 @@ repos:
         pass_filenames: false
         stages: [pre-commit, pre-push]
 
-      # --- Shell ---
-      #
-      # scripts/ and tests/helpers/ are the only shell this tree authors.
-      # shfmt takes its indent from .editorconfig, and -d reports instead of
-      # rewriting, so the file a later hook reads is the file that was
-      # staged.
-      #
-      # Neither tool sees *.bats. A bats file opens its tests with
-      # `@test "name" {`, which is not bash and does not parse. bats itself
-      # is the gate for those, through scripts/run-tests.sh.
-      #
-      # The stub `pi` carries no extension, because it stands in for a
-      # command on PATH, so it is matched by path.
-      - id: shellcheck
-        name: shellcheck
-        entry: shellcheck
-        language: system
-        files: '(\.(sh|bash)$|^tests/helpers/stubs/)'
-      - id: shfmt
-        name: shfmt
-        entry: shfmt -d
-        language: system
-        files: '(\.(sh|bash)$|^tests/helpers/stubs/)'
-
       # --- Types ---
       #
       # Both read a config file this repository now carries, and a config
       # nothing reads is drift waiting to happen. Neither passes filenames:
       # a type error is a property of the program, not of one file, and
       # checking a subset reports errors that a whole-project run does not.
+      # owner: pyproject.toml (outside-caller) the language server of the editor runs pyright-langserver from the same dev group, so the hook runs that pyright through uv.
       - id: pyright
         name: pyright
-        entry: pyright
+        entry: uv run --no-sync pyright
         language: system
         files: '\.py$'
         pass_filenames: false
+      # owner: package.json (project-environment) tsc checks the extensions against the node_modules and the Pi types of this tree.
       - id: tsc
         name: tsc --noEmit
         entry: tsc --noEmit
@@ -191,6 +172,7 @@ repos:
       # tag on a test decides which one picks it up, and the budget in the
       # header decides what each stage may cost. `just test` calls these,
       # never the other way round.
+      # owner: devshell (no-hook-language) a script of this repository.
       - id: pi-config-test-fast
         name: tests (fast)
         entry: scripts/run-tests.sh fast
@@ -199,6 +181,7 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      # owner: devshell (no-hook-language) a script of this repository.
       - id: pi-config-test-slow
         name: tests (slow)
         entry: scripts/run-tests.sh slow
@@ -206,6 +189,41 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-push]
+
+  # --- Shell ---
+  #
+  # scripts/ and tests/helpers/ are the only shell this tree authors. shfmt
+  # takes its indent from .editorconfig, and -d reports instead of rewriting,
+  # so the file a later hook reads is the file that was staged. The args
+  # replace the --write of the upstream hook, and the manifest names more
+  # stages than this tree runs it at.
+  #
+  # Neither tool sees *.bats. A bats file opens its tests with
+  # `@test "name" {`, which is not bash and does not parse. bats itself is the
+  # gate for those, through scripts/run-tests.sh.
+  #
+  # The stub `pi` carries no extension, because it stands in for a command on
+  # PATH, so it is matched by path.
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        types: [file]
+        files: '(\.(sh|bash)$|^tests/helpers/stubs/)'
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.14.1-1
+    hooks:
+      - id: shfmt
+        args: [-d]
+        types: [file]
+        stages: [pre-commit]
+        files: '(\.(sh|bash)$|^tests/helpers/stubs/)'
+
+  # --- Nix dead code ---
+  - repo: https://github.com/astro/deadnix
+    rev: v1.3.2
+    hooks:
+      - id: deadnix
 
   # --- Markdown style gate ---
   #
@@ -237,17 +255,38 @@ repos:
         types: [markdown]
         entry: '^\s*\[[^\]]+\]:\s+(?!https?://|ftp://|mailto:|tel:|/|#|\.\.?/|<)[^\s/:#]+\.[A-Za-z0-9]+'
 
-  # --- Python ---
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.8
+  # --- No language library in a flake ---
+  #
+  # A Python package goes to pyproject.toml or a PEP 723 block, a Node package
+  # to package.json.
+  - repo: local
     hooks:
+      - id: no-language-library-in-flake
+        name: a flake holds no language library
+        language: pygrep
+        entry: '^(?!\s*#).*(withPackages|python3[0-9]*Packages\.|pythonPackages\.|nodePackages\.|perlPackages\.)'
+        files: '(^|/)flake\.nix$|(^|/)nix/.*\.nix$'
+
+  # --- Python ---
+  #
+  # The editor runs `ruff server` from the same dev group, so the hooks run
+  # that ruff through uv. The file types are the ones of the upstream hooks.
+  - repo: local
+    hooks:
+      # owner: pyproject.toml (outside-caller) the language server of the editor runs ruff server from the dev group, so the hook runs that ruff.
       - id: ruff-check
+        name: ruff check
+        entry: uv run --no-sync ruff check --force-exclude --fix
         language: system
-        entry: ruff check --force-exclude
-        args: [--fix]
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      # owner: pyproject.toml (outside-caller) the language server of the editor runs ruff server from the dev group, so the hook runs that ruff.
       - id: ruff-format
+        name: ruff format
+        entry: uv run --no-sync ruff format --force-exclude
         language: system
-        entry: ruff format --force-exclude
+        types_or: [python, pyi, jupyter, markdown]
+        require_serial: true
 
   # --- Spelling (report only) ---
   #
@@ -258,7 +297,6 @@ repos:
     rev: v1.50.2
     hooks:
       - id: typos
-        language: system
         args: [--force-exclude]
 
   # --- Secrets ---
@@ -270,13 +308,11 @@ repos:
     rev: v0.1.11
     hooks:
       - id: ripsecrets
-        language: system
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
       - id: gitleaks
-        language: system
         stages: [pre-push]
 
   # --- Link check (network, push time only) ---
@@ -286,6 +322,7 @@ repos:
   - repo: https://github.com/lycheeverse/lychee
     rev: lychee-v0.24.2
     hooks:
+      # owner: devshell (no-hook-language) lychee publishes no hook in a language that pre-commit builds.
       - id: lychee-system
         stages: [pre-push]
         types: [markdown]
@@ -300,8 +337,6 @@ repos:
     rev: v1.1.11
     hooks:
       - id: committed
-        language: system
-        stages: [commit-msg]
 
   # --- Keep this file honest ---
   - repo: meta

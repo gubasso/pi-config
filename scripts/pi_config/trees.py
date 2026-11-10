@@ -27,7 +27,7 @@ def installed_npm(dest: str) -> dict[str, str]:
         return {}
     try:
         data = json.load(open(path, encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return {}
     deps = data.get("dependencies")
     return dict(deps) if isinstance(deps, dict) else {}

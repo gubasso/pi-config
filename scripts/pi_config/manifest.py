@@ -11,7 +11,7 @@ import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .fsx import store_owned
 from .paths import landing_roots, within_root
@@ -72,7 +72,7 @@ def read_manifest(dest: str) -> list[dict[str, str]]:
 def write_manifest(src: str, dest: str, landed: list[tuple[str, str]]) -> None:
     payload = {
         "version": MANIFEST_VERSION,
-        "deployedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "deployedAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source": os.path.abspath(src),
         "paths": [{"path": path, "how": how} for path, how in landed],
     }
@@ -159,7 +159,7 @@ def prove_manifest(src: str, dest: str) -> None:
 def manifest_source(dest: str) -> str:
     try:
         data = json.load(open(manifest_path(dest), encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return ""
     return str(data.get("source") or "") if isinstance(data, dict) else ""
 

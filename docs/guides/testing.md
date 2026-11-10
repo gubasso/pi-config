@@ -16,7 +16,7 @@ While you write one test, call the runner or the tool by hand:
 
 ```sh
 scripts/run-tests.sh fast unit     # one budget, one kind
-pytest tests/unit -k veto          # one case
+uv run pytest tests/unit -k veto   # one case
 bats tests/e2e/converge.bats       # one file
 vitest run tests/unit              # the TypeScript half
 ```
@@ -117,7 +117,7 @@ Run `git` without dropping the environment a hook inherits. A pre-commit hook ru
 
 ## Adding a dependency
 
-Python and shell tools come from `flake.nix`. Add the package, re-enter the shell, and add the command to the loop in `just devshell-check`; a meta test keeps those two in step.
+A Python package or tool goes to `pyproject.toml` with `uv add --dev`, which updates `uv.lock`; the devShell syncs it into `.venv`. A hook tool goes to `.pre-commit-config.yaml`. Any other tool goes to `flake.nix`. Add the command to the loop in `just devshell-check` when a recipe, a hook, or a language server calls it; a meta test checks that each one sits in its owner.
 
 JavaScript comes from `package-lock.json`, which Nix builds:
 
