@@ -42,7 +42,7 @@ devshell-check:
     # The devShell packages, then the tools that .venv (uv.lock) and
     # node_modules (package-lock.json) put on PATH, which a recipe, a hook,
     # or a language server calls.
-    for t in just pre-commit python3 uv node dprint lychee nixfmt statix jq bats \
+    for t in just pre-commit python3 uv node cargo dprint lychee nixfmt statix jq bats \
              nixd yaml-language-server bash-language-server taplo \
              vscode-json-language-server marksman \
              pytest ruff pyright-langserver vitest tsc; do

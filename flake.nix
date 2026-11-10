@@ -52,6 +52,11 @@
               # shellHook syncs uv.lock into .venv.
               python
               uv
+              # The toolchain that pre-commit builds the rust hooks with,
+              # ripsecrets and deadnix, on a machine with no cargo. Without
+              # it, pre-commit bootstraps rustup, which needs curl.
+              cargo
+              rustc
               # markdownlint-cli2 runs on this node through
               # `language_version: system`. pre-commit's own nodeenv
               # downloads a generic-glibc node whose ELF interpreter
