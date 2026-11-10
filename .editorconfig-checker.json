@@ -1,6 +1,7 @@
 {
   "Exclude": [
     "^flake\\.lock$",
-    "^package-lock\\.json$"
+    "^package-lock\\.json$",
+    "^uv\\.lock$"
   ]
 }

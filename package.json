@@ -5,6 +5,10 @@
   "keywords": [
     "pi-package"
   ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "vitest": "vitest"
+  },
   "devDependencies": {
     "@types/node": "^24.13.5",
     "typescript": "^7.0.2",

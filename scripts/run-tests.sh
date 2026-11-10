@@ -142,7 +142,8 @@ fi
 if has_tests "*.test.ts"; then
   ran=$((ran + 1))
   set +e
-  vitest run --root . --passWithNoTests "$scope"
+  # package.json owns vitest, so npm runs it.
+  npm run --silent vitest -- run --root . --passWithNoTests "$scope"
   status=$?
   set -e
   note_result vitest "$status"

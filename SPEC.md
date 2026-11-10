@@ -558,11 +558,11 @@ This includes `git commit`. The gates that keep `language: system` resolve their
 
 ### Gates
 
-| Stage        | What runs                                                                                     |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| `pre-commit` | formatting, linting, types, staged-diff secrets, `just check`, and the `fast` tests           |
-| `commit-msg` | `committed`, over `committed.toml`                                                            |
-| `pre-push`   | `gitleaks` over the whole history, `lychee` over the markdown, `just check`, the `slow` tests |
+| Stage        | What runs                                                                           |
+| ------------ | ----------------------------------------------------------------------------------- |
+| `pre-commit` | formatting, linting, types, staged-diff secrets, `just check`, and the `fast` tests |
+| `commit-msg` | `committed`, over `committed.toml`                                                  |
+| `pre-push`   | `gitleaks` over the whole history, `lychee` over the markdown, the `slow` tests     |
 
 `just check` is the repository's own contract, and a hook calls it. It refuses a tracked secret, an uncovered `.gitignore` line, a pin without its `docs/plugins/<name>/` set, and an unclassified sidecar. `just lint` runs every gate over the whole tree by hand.
 
@@ -582,7 +582,7 @@ The dprint hook runs `dprint fmt --allow-no-files`. Without the flag, dprint 0.5
 
 If a hook ever rewrites a landed sidecar, the next step is `just deploy`. It 3-way-syncs the file and restores the hardlink.
 
-nix writes `flake.lock` and npm writes `package-lock.json`. A generated file follows its generator, so no check rewrites or judges them. `dprint.json` excludes `package-lock.json`, and dprint does not format `flake.lock`. The three whitespace fixers skip both through a negative `files` pattern, under the YAML anchor `not_a_lock_file`, beside the `runtime_owned` exclude. typos skips both in `_typos.toml`, and editorconfig-checker in `.editorconfig-checker.json`, so a direct run of either tool agrees with its hook. The reading hooks keep them: `check-json5`, the secret scans, and the merge-conflict check.
+nix writes `flake.lock`, npm writes `package-lock.json`, and uv writes `uv.lock`. A generated file follows its generator, so no check rewrites or judges them. `dprint.json` excludes `package-lock.json`, and dprint does not format `flake.lock`. The three whitespace fixers skip both through a negative `files` pattern, under the YAML anchor `not_a_lock_file`, beside the `runtime_owned` exclude. typos skips both in `_typos.toml`, and editorconfig-checker in `.editorconfig-checker.json`, so a direct run of either tool agrees with its hook. The reading hooks keep them: `check-json5`, the secret scans, and the merge-conflict check.
 
 ---
 

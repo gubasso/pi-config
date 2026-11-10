@@ -2,7 +2,9 @@
 #
 # Per-stage budget:
 #   pre-commit : fast, local, deterministic.
-#   pre-push   : slower and network-aware (link check, full-history secrets).
+#   pre-push   : slower and network-aware (link check, full-history secrets,
+#                slow tests). It does not repeat a pre-commit check, so a
+#                hook whose upstream manifest names pre-push sets its stages.
 #   commit-msg : message content, on top of the global grammar hook.
 #
 # What each tool owns:
@@ -53,7 +55,7 @@ repos:
       # write, and the pair trade the same byte forever. The exclude list is
       # the one in dprint.json.
       #
-      # They also skip the lock files that nix and npm write. A generated file
+      # They also skip the lock files that nix, npm, and uv write. A generated file
       # follows its generator: the dev environment rule of nix-secrets,
       # home/apps/claude-session/rules/dev-environment.md. The negative `files`
       # pattern keeps them out
@@ -62,20 +64,24 @@ repos:
       # _typos.toml and .editorconfig-checker.json.
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md] # keep two-space hard breaks
-        files: &not_a_lock_file '^(?!(flake\.lock|package-lock\.json)$)'
+        files: &not_a_lock_file '^(?!(flake\.lock|package-lock\.json|uv\.lock)$)'
         exclude: &runtime_owned '^home/\.pi/agent/(settings\.json|keybindings\.json|pi-plan-mode\.json|99extensions\.json|intercom/config\.json|extensions/.*/config\.json)$'
+        stages: [pre-commit]
       - id: end-of-file-fixer
         files: *not_a_lock_file
         exclude: *runtime_owned
+        stages: [pre-commit]
       - id: mixed-line-ending
         args: [--fix=lf]
         files: *not_a_lock_file
         exclude: *runtime_owned
       - id: check-added-large-files
         args: ['--maxkb=1024']
+        stages: [pre-commit]
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: destroyed-symlinks
+        stages: [pre-commit]
       - id: check-yaml
       - id: check-toml
       - id: detect-private-key
@@ -143,7 +149,7 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
-        stages: [pre-commit, pre-push]
+        stages: [pre-commit]
 
       # --- Types ---
       #
@@ -158,10 +164,10 @@ repos:
         language: system
         files: '\.py$'
         pass_filenames: false
-      # owner: package.json (project-environment) tsc checks the extensions against the node_modules and the Pi types of this tree.
+      # owner: package.json (project-environment) tsc checks the extensions against the node_modules and the Pi types of this tree, through npm run.
       - id: tsc
         name: tsc --noEmit
-        entry: tsc --noEmit
+        entry: npm run --silent typecheck
         language: system
         files: '\.ts$'
         pass_filenames: false
@@ -298,6 +304,7 @@ repos:
     hooks:
       - id: typos
         args: [--force-exclude]
+        stages: [pre-commit]
 
   # --- Secrets ---
   #
