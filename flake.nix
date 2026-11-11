@@ -3,13 +3,19 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # The store guard of the canon (exobrain): `exobrain store-guard --daily`
+    # in .envrc warns about working-tree copies in the Nix store.
+    exobrain-tech = {
+      url = "github:gubasso/exobrain-tech/v1.0.0";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # `...` is required: Nix always applies `outputs (inputs // { self = …; })`,
   # so a closed attrset breaks the flake the moment `self` is unused and gets
   # dropped. Keep it even when no extra argument is consumed.
   outputs =
-    { nixpkgs, ... }:
+    { nixpkgs, exobrain-tech, ... }:
     let
       # One system: the host this repository lands onto. Grow the list
       # together with a machine that runs the gates natively.
@@ -84,6 +90,8 @@
               nixfmt
               statix
               jq
+              # exobrain, the store guard that .envrc runs once a day.
+              exobrain-tech.packages.${system}.default
               # Language servers pi-lsp-client probes on PATH for the
               # languages this repository actually contains. Do not add a
               # server for a language that is not here.

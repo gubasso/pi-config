@@ -335,6 +335,13 @@ repos:
         types: [markdown]
         args: [--no-progress]
 
+  # A flake reference reads the git tree of a checkout, never a path copy of
+  # the whole folder into the Nix store. The hook is published by exobrain-tech.
+  - repo: https://github.com/gubasso/exobrain-tech
+    rev: v1.0.0
+    hooks:
+      - id: no-path-flake-reference
+
   # --- Commit message content ---
   #
   # The configured global hook ~/.config/git/hooks/commit-msg-conventional
