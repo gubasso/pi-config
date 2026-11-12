@@ -6,7 +6,7 @@
     # The store guard of the canon (exobrain): `exobrain store-guard --daily`
     # in .envrc warns about working-tree copies in the Nix store.
     exobrain-tech = {
-      url = "github:gubasso/exobrain-tech/v1.0.0";
+      url = "github:gubasso/exobrain-tech/v1.1.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -45,28 +45,27 @@
             # declares it natively. pyproject.toml and uv.lock own the Python
             # package and its dev tools, package.json and package-lock.json
             # own the TypeScript tools, and .pre-commit-config.yaml owns each
-            # hook tool that pre-commit can build. This list holds the
+            # hook tool that the hook runner can build. The host supplies the
+            # hook runner prek. This list holds the
             # toolchains, the runners, and each tool that no owner above can
             # declare, such as the language servers the agent uses on this
             # tree. `just devshell-check` makes sure each tool is on PATH.
             packages = with pkgs; [
               # The landing contract: deploy, doctor, status, check.
               just
-              # The gate runner.
-              pre-commit
               # The interpreter and the manager of the Python package. The
               # shellHook syncs uv.lock into .venv.
               python
               uv
-              # The toolchain that pre-commit builds the rust hooks with,
-              # ripsecrets and deadnix, on a machine with no cargo. Without
-              # it, pre-commit bootstraps rustup, which needs curl.
+              # The toolchain that the hook runner builds the rust hooks with,
+              # ripsecrets and deadnix, on a machine with no cargo. prek takes
+              # it from PATH and downloads none.
               cargo
               rustc
               # markdownlint-cli2 runs on this node through
-              # `language_version: system`. pre-commit's own nodeenv
-              # downloads a generic-glibc node whose ELF interpreter
-              # /lib64/ld-linux-x86-64.so.2 does not exist on this host.
+              # `language_version: system`, so the hook runner downloads no
+              # node. A downloaded generic-glibc node needs the ELF interpreter
+              # /lib64/ld-linux-x86-64.so.2, which does not exist on this host.
               nodejs
               # Builds node_modules from package-lock.json and links it into
               # the tree. See the npmDeps attribute and the shellHook below.
@@ -80,13 +79,13 @@
                 p.bats-file
               ]))
               # The formatter of record for markdown, JSON, and TypeScript,
-              # which has no hook in a language that pre-commit builds.
+              # which has no hook in a language that the hook runner builds.
               # dprint.json lists what it must not touch.
               dprint
               # The link check of the pre-push stage (lychee-system).
               lychee
               # The RFC 166 formatter, which `nix fmt` and the nixfmt hook
-              # share, and statix, which has no hook that pre-commit builds.
+              # share, and statix, which has no hook that the hook runner builds.
               nixfmt
               statix
               jq

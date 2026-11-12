@@ -1,0 +1,17 @@
+# The host tools of pi-config's dev environment
+# (project-platform:host-requirements-list-the-host-tools). The justfile
+# checks nix and git once before any recipe, and prek in the recipes that
+# run it, each through the devshell.
+# prek owns its version through minimum_prek_version in
+# .pre-commit-config.yaml. pi itself is the product's own runtime check
+# (scripts/pi_config), outside this file.
+schema = 1
+
+[tools.git]
+
+[tools.prek]
+version = "*"
+
+[tools.nix]
+
+[tools.direnv]

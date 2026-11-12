@@ -41,6 +41,10 @@
 #
 # Install every stage with `just hooks`.
 
+# The host supplies the hook runner prek, and this is the oldest prek the
+# configuration accepts
+# (https://prek.j178.dev/reference/configuration/#minimum_prek_version).
+minimum_prek_version: "0.5.7"
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
 default_stages: [pre-commit]
 
@@ -111,7 +115,7 @@ repos:
   # --- Formatters and linters that resolve off PATH ---
   - repo: local
     hooks:
-      # owner: devshell (no-hook-language) upstream dprint publishes no hook in a language that pre-commit builds.
+      # owner: devshell (no-hook-language) upstream dprint publishes no hook in a language that the hook runner builds.
       - id: dprint
         name: dprint fmt
         entry: dprint fmt --allow-no-files
@@ -126,7 +130,7 @@ repos:
         entry: nixfmt
         language: system
         files: '\.nix$'
-      # owner: devshell (no-hook-language) statix has no hook in a language that pre-commit builds.
+      # owner: devshell (no-hook-language) statix has no hook in a language that the hook runner builds.
       - id: statix
         name: statix check
         entry: statix check
@@ -134,7 +138,7 @@ repos:
         files: '\.nix$'
         pass_filenames: false
 
-      # owner: devshell (no-hook-language) just publishes no hook in a language that pre-commit builds.
+      # owner: devshell (no-hook-language) just publishes no hook in a language that the hook runner builds.
       - id: just-fmt
         name: just --fmt --check
         entry: just --unstable --fmt --check
@@ -329,18 +333,23 @@ repos:
   - repo: https://github.com/lycheeverse/lychee
     rev: lychee-v0.24.2
     hooks:
-      # owner: devshell (no-hook-language) lychee publishes no hook in a language that pre-commit builds.
+      # owner: devshell (no-hook-language) lychee publishes no hook in a language that the hook runner builds.
       - id: lychee-system
         stages: [pre-push]
         types: [markdown]
         args: [--no-progress]
 
-  # A flake reference reads the git tree of a checkout, never a path copy of
-  # the whole folder into the Nix store. The hook is published by exobrain-tech.
+  # The hooks that exobrain-tech publishes. A flake reference reads the git
+  # tree of a checkout, never a path copy of the whole folder into the Nix
+  # store. A flake holds no git hook runner, because the host supplies prek.
+  # host-requirements.toml parses each time it changes; the hook runs the
+  # exobrain of the devshell.
   - repo: https://github.com/gubasso/exobrain-tech
-    rev: v1.0.0
+    rev: v1.1.0
     hooks:
       - id: no-path-flake-reference
+      - id: no-hook-runner-in-flake
+      - id: host-requirements
 
   # --- Commit message content ---
   #

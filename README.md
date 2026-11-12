@@ -33,7 +33,7 @@ just hooks        # install the git hooks for every stage
 just deploy
 ```
 
-`direnv allow` is a one-time step per clone. Without direnv, wrap each command: `nix develop --command just deploy`.
+`direnv allow` is a one-time step per clone. Without direnv, wrap each command: `nix develop --command just deploy`. [`host-requirements.toml`](./host-requirements.toml) lists the tools that the host supplies.
 
 ## Commands
 

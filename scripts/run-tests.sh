@@ -3,7 +3,7 @@
 #
 # This script is the mechanism. `.pre-commit-config.yaml` is the source of
 # truth for when it runs: the `fast` budget at pre-commit, the `slow` budget
-# at pre-push. `just test` calls pre-commit, never this file. Calling this
+# at pre-push. `just test` calls the hook runner, never this file. Calling this
 # file by hand is debugging.
 #
 # Three axes classify every test. This script selects on two of them and

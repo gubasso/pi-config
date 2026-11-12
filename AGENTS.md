@@ -15,7 +15,7 @@ See `SPEC.md`. Package selection: [docs/guides/package-selection.md](docs/guides
 
 ## Tests
 
-`just test` runs what a commit must pass, `just test-slow` what a push must pass. Both call pre-commit, which is the source of truth for when the suite runs.
+`just test` runs what a commit must pass, `just test-slow` what a push must pass. Both call the hook runner prek, which the host supplies, and the hooks are the source of truth for when the suite runs.
 
 A test goes in `tests/<kind>/`, where the kind is `unit`, `integration`, `e2e`, or `meta`. It carries a cost (`fast` or `slow`) and a venue (`local`, `ci`, or both). A test naming neither never runs, so collection refuses it.
 
