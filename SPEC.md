@@ -114,14 +114,15 @@ pi-config/                          # source tree (clone lives anywhere)
 ├── vitest.config.ts                # the TypeScript half of the suite
 ├── pytest.ini                      # the Python half, and the marker list
 ├── pyrightconfig.json
-├── flake.nix                       # devShell: every tool a recipe or hook calls
+├── flake.nix                       # devShell: each project tool a recipe or hook calls
 ├── flake.lock
-├── .envrc                          # direnv enters that devShell
+├── .envrc                          # direnv enters that devShell; exobrain warns
+├── host-requirements.toml          # the tools the host supplies: prek, exobrain, …
 ├── .pre-commit-config.yaml         # the gates; see §14
 ├── dprint.json                     # formatter of record for md, JSON, and ts
 ├── .markdownlint-cli2.jsonc
 ├── .editorconfig
-├── committed.toml                  # commit message content rules
+├── committed.toml                  # commit message rules, grammar included
 ├── ruff.toml
 ├── lychee.toml
 │
@@ -544,7 +545,7 @@ Pi loads global `AGENTS.md` from the live agent directory **and** from the proje
 
 ## 14. Development environment
 
-Each dependency has one owner, the most specific file that declares it natively (the dev environment rule of nix-secrets, `home/apps/claude-session/rules/dev-environment.md`). `pyproject.toml` and `uv.lock` own the Python package `pi_config` and its dev tools: pytest, pyyaml, ruff, and pyright, whose `ruff server` and `pyright-langserver` the editor uses. The devShell syncs them into `.venv` and puts it on PATH. `package.json` and `package-lock.json` own the TypeScript tools, vitest and tsc, and Nix builds `node_modules` from the lockfile through `importNpmLock`. `.pre-commit-config.yaml` owns each hook tool that pre-commit can build an environment for, pinned by `rev`. `flake.nix` owns the toolchains, the runners, and each tool that no owner above can declare, such as dprint, statix, lychee, and the language servers the agent uses on this tree. A flake holds no language library. No test runner is ever installed by hand. Do not add a language server for a language this repository does not contain.
+Each dependency has one owner, the most specific file that declares it natively (the dev environment rule of nix-secrets, `home/apps/claude-session/rules/dev-environment.md`). `pyproject.toml` and `uv.lock` own the Python package `pi_config` and its dev tools: pytest, pyyaml, ruff, and pyright, whose `ruff server` and `pyright-langserver` the editor uses. The devShell syncs them into `.venv` and puts it on PATH. `package.json` and `package-lock.json` own the TypeScript tools, vitest and tsc, and Nix builds `node_modules` from the lockfile through `importNpmLock`. `.pre-commit-config.yaml` owns each hook tool that the hook runner prek can build an environment for, pinned by `rev`. `flake.nix` owns the toolchains, the runners, and each tool that no owner above can declare, such as dprint, statix, lychee, and the language servers the agent uses on this tree. The host supplies the hook runner prek and the `exobrain` CLI, and `host-requirements.toml` lists them. A flake holds no language library. No test runner is ever installed by hand. Do not add a language server for a language this repository does not contain.
 
 ### Enter the shell
 
@@ -566,9 +567,11 @@ This includes `git commit`. The gates that keep `language: system` resolve their
 
 `just check` is the repository's own contract, and a hook calls it. It refuses a tracked secret, an uncovered `.gitignore` line, a pin without its `docs/plugins/<name>/` set, and an unclassified sidecar. `just lint` runs every gate over the whole tree by hand.
 
-The Conventional Commits grammar belongs to the configured global `commit-msg` hook, not to this repository. `committed` adds only what that hook leaves alone: subject and body length, lower case after the colon, and no trailing period.
+`committed` judges the whole message over `committed.toml`: the Conventional Commits grammar, the subject and body length, the case after the colon, and no trailing period. The file comes from the reference set of exobrain-tech, with `style = "conventional"`, because no other hook of this repository judges the grammar.
 
-A hook whose upstream publishes it in a language that pre-commit builds runs in that environment, pinned by `rev`. A hook that keeps `language: system`, or an upstream `-system` id, carries an `# owner:` comment directly above it that names its owner, its class, and its reason. A NixOS host runs a dynamically linked hook binary through nix-ld.
+The hooks follow the reference sets `common`, `python`, `bash`, and `nix` of exobrain-tech. prek runs the hooks of `pre-commit/pre-commit-hooks` and `check-json5` as its own built-ins, with no `rev`. The `hook-revisions` hook holds each shared `rev` to the exobrain-tech tag of `.pre-commit-config.yaml`, and `exobrain hooks sync --to <tag>` moves them. A field that differs from a set states its reason in a comment directly above the hook.
+
+A hook whose upstream publishes it in a language that prek builds runs in that environment, pinned by `rev`. A hook that keeps `language: system`, or an upstream `-system` id, carries an `# owner:` comment directly above it that names its owner, its class, and its reason. A NixOS host runs a dynamically linked hook binary through nix-ld.
 
 ### Who owns a file's bytes
 

@@ -10,7 +10,7 @@ just test-slow   # what a push must pass
 just test-all    # both
 ```
 
-All three call pre-commit, because the hook is the source of truth for when the suite runs. A recipe that ran the tests directly would be a second answer to that question.
+All three call the hook runner prek, because the hook is the source of truth for when the suite runs. A recipe that ran the tests directly would be a second answer to that question.
 
 While you write one test, call the runner or the tool by hand:
 
