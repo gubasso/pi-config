@@ -49,9 +49,14 @@ default_install_hook_types: [pre-commit, commit-msg, pre-push]
 default_stages: [pre-commit]
 
 repos:
-  # --- Housekeeping ---
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+  # --- prek built-in hooks ---
+  #
+  # prek runs these in its own binary: no clone, no environment, and no `rev`.
+  # They take the place of the hooks of pre-commit/pre-commit-hooks and of the
+  # check-json5 repositories. Where a built-in judges less than its upstream
+  # hook by default, its arguments restore the upstream behavior
+  # (https://prek.j178.dev/0.5.7/reference/built-in-hooks/).
+  - repo: builtin
     hooks:
       # The three whitespace fixers skip the JSON Pi writes at runtime, for
       # the same reason dprint.json excludes it. Pi writes settings.json with
@@ -88,17 +93,18 @@ repos:
         stages: [pre-commit]
       - id: check-yaml
       - id: check-toml
-      - id: detect-private-key
-
-  # --- JSON and JSONC syntax ---
-  #
-  # check-json5 parses JSON that is valid JSON5, comments and trailing commas
-  # included, so it does not false-fail on .markdownlint-cli2.jsonc. It is the
-  # syntax gate only; formatting belongs to the dprint json plugin.
-  - repo: https://gitlab.com/bmares/check-json5
-    rev: v1.0.1
-    hooks:
+      # check-json5 parses JSON with comments and trailing commas, so it does
+      # not refuse a commented .json configuration such as dprint.json or a
+      # .jsonc file. The built-in selects only .json5 files through `types`,
+      # and the upstream hook selected json and json5. `types` resets the
+      # filter to every file, and `types_or` restores json and json5 and adds
+      # jsonc. Unlike the upstream hook, the built-in refuses a duplicate key.
+      # It is the syntax gate only. A formatter owns the layout, and the stock
+      # check-json refuses comments.
       - id: check-json5
+        types: [file]
+        types_or: [json, json5, jsonc]
+      - id: detect-private-key
 
   # --- EditorConfig ---
   - repo: https://github.com/editorconfig-checker/editorconfig-checker
