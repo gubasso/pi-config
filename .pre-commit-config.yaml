@@ -151,7 +151,7 @@ repos:
   # excludes its generated files in .editorconfig-checker.json, the tool's own
   # configuration, so a direct run skips them too.
   - repo: https://github.com/editorconfig-checker/editorconfig-checker
-    rev: v4.0.1
+    rev: v4.0.2
     hooks:
       - id: editorconfig-checker
         alias: ec
@@ -287,7 +287,7 @@ repos:
   # project: both hooks keep `files:`, and shfmt keeps `-d` in place of the
   # `--write` of the bash set, for the reasons above.
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1
+    rev: v0.11.0.1-1
     hooks:
       - id: shellcheck
         types: [file]
@@ -389,7 +389,7 @@ repos:
   # excludes of _typos.toml for the files that prek passes. The manifest
   # declares pre-push too, so `stages:` is explicit.
   - repo: https://github.com/crate-ci/typos
-    rev: v1.50.2
+    rev: v1.52.2
     hooks:
       - id: typos
         args: [--force-exclude]
@@ -431,14 +431,17 @@ repos:
   # The hooks that exobrain-tech publishes. A flake reference reads the git
   # tree of a checkout, never a path copy of the whole folder into the Nix
   # store. A flake holds no git hook runner, because the host supplies prek.
-  # host-requirements.toml parses each time it changes; the hook runs the
-  # exobrain of the devshell.
+  # host-requirements.toml parses each time it changes. hook-revisions holds
+  # the `rev` of each repository of the named sets to the copy at this tag.
+  # The hooks call the exobrain CLI of the host.
   - repo: https://github.com/gubasso/exobrain-tech
-    rev: v1.1.0
+    rev: v1.2.0
     hooks:
       - id: no-path-flake-reference
       - id: no-hook-runner-in-flake
       - id: host-requirements
+      - id: hook-revisions
+        args: [--set, common, --set, python, --set, bash, --set, nix]
 
   # --- Commit message ---
   #
@@ -448,7 +451,7 @@ repos:
   # at the end of the subject. This tree has no release-kit block, so
   # committed alone judges the message.
   - repo: https://github.com/crate-ci/committed
-    rev: v1.1.11
+    rev: v1.1.12
     hooks:
       - id: committed
         stages: [commit-msg]
