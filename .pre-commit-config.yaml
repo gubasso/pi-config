@@ -5,11 +5,14 @@
 #   pre-push   : slower and network-aware (link check, full-history secrets,
 #                slow tests). It does not repeat a pre-commit check, so a
 #                hook whose upstream manifest names pre-push sets its stages.
-#   commit-msg : message content, on top of the global grammar hook.
+#   commit-msg : the Conventional Commits grammar and the message layout.
+#
+# This tree has no `rk integrate` gate, so it drops the pre-merge-commit type
+# and stage of the reference sets of exobrain-tech, as the common set says.
 #
 # What each tool owns:
-#   pre-commit-hooks    : whitespace, line endings, basic safety.
-#   check-json5         : JSON and JSONC syntax, comments included.
+#   prek built-ins      : whitespace, line endings, symlinks, shebangs, basic
+#                         safety, and the YAML, TOML, and JSON syntax.
 #   editorconfig-checker: honor .editorconfig.
 #   dprint              : the formatter of record for markdown and JSON.
 #                         dprint.json lists the runtime-owned files it must
@@ -27,17 +30,24 @@
 #   lychee              : link check, at push time.
 #   just check          : this repository's own contract — no tracked secret,
 #                         gitignore coverage, every plugin sidecar classified.
-#   committed           : subject and body length, punctuation, case.
+#   md-toc              : the list between two `<!--TOC-->` markers.
+#   committed           : the grammar, subject and body length, punctuation,
+#                         case.
 #
 # Who owns each tool: the most specific file that declares it natively (the
 # dev environment rule of nix-secrets,
-# home/apps/claude-session/rules/dev-environment.md). pre-commit owns each
-# hook tool that it can build an environment for, pinned by `rev`.
+# home/apps/claude-session/rules/dev-environment.md). This file owns each
+# hook tool that prek can build an environment for, pinned by `rev`.
 # pyproject.toml and uv.lock own the Python tools, package.json the
 # TypeScript tools, and flake.nix the toolchains and each tool that no owner
 # above can declare. A hook that keeps `language: system`, or an upstream
 # `-system` id, names its owner, class, and reason in an `# owner:` comment
 # directly above it.
+#
+# The hooks follow the reference sets common, python, bash, and nix of
+# exobrain-tech. hook-revisions holds each shared `rev` to the exobrain-tech
+# tag of this file. A field that differs from a set states its reason in a
+# comment directly above the hook.
 #
 # Install every stage with `just hooks`.
 
@@ -71,6 +81,11 @@ repos:
       # beside the shared runtime exclude, which a drift test pins to
       # dprint.json. typos and editorconfig-checker skip the lock files in
       # _typos.toml and .editorconfig-checker.json.
+      #
+      # project: `files: *not_a_lock_file` and `exclude: *runtime_owned` in
+      # place of the lock exclude of the common set, because
+      # tests/meta/test_drift.py pins one shared `^home/` exclude to
+      # dprint.json (SPEC.md §14).
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md] # keep two-space hard breaks
         files: &not_a_lock_file '^(?!(flake\.lock|package-lock\.json|uv\.lock)$)'
@@ -80,6 +95,8 @@ repos:
         files: *not_a_lock_file
         exclude: *runtime_owned
         stages: [pre-commit]
+      # The default `auto` keeps the most frequent ending of a file, so a file
+      # that holds only CRLF passes. `--fix=lf` holds every file to LF.
       - id: mixed-line-ending
         args: [--fix=lf]
         files: *not_a_lock_file
@@ -88,11 +105,24 @@ repos:
         args: ['--maxkb=1024']
         stages: [pre-commit]
       - id: check-case-conflict
+      # Without the argument the hook passes outside a merge or a rebase, so a
+      # marker that a resolved conflict left behind lands unseen.
       - id: check-merge-conflict
+        args: [--assume-in-merge]
       - id: destroyed-symlinks
         stages: [pre-commit]
+      - id: check-executables-have-shebangs
+        stages: [pre-commit]
+      - id: check-shebang-scripts-are-executable
+        stages: [pre-commit]
+      # prek accepts an unknown tag unless it gets --disallow-unknown-tags. The
+      # upstream hook refuses one while it loads the file.
       - id: check-yaml
+        args: [--disallow-unknown-tags]
       - id: check-toml
+      # project: no check-xml and no check-symlinks, because the tree tracks
+      # no XML file and no symlink, and check-hooks-apply refuses a hook that
+      # matches no file.
       # check-json5 parses JSON with comments and trailing commas, so it does
       # not refuse a commented .json configuration such as dprint.json or a
       # .jsonc file. The built-in selects only .json5 files through `types`,
@@ -107,16 +137,39 @@ repos:
       - id: detect-private-key
 
   # --- EditorConfig ---
+  #
+  # The upstream `language: golang` hook, which prek builds at the pinned rev.
+  # It checks what no formatter owns: the charset, the line endings, the
+  # trailing whitespace, and the indent style.
+  #   - -disable-insert-final-newline: end-of-file-fixer owns it.
+  #   - -disable-indent-size: each formatter owns the indentation of its files
+  #     (ruff, dprint, nixfmt, shfmt). The checker counts left padding
+  #     without the syntax, so it refuses formatter output, such as a
+  #     continued string aligned to its opening quote, or a docstring.
+  # Markdown is excluded: the checker flags fenced code and the odd-width
+  # continuation of an ordered list, and dprint owns Markdown. The project
+  # excludes its generated files in .editorconfig-checker.json, the tool's own
+  # configuration, so a direct run skips them too.
   - repo: https://github.com/editorconfig-checker/editorconfig-checker
     rev: v4.0.1
     hooks:
       - id: editorconfig-checker
         alias: ec
-        # end-of-file-fixer owns final-newline enforcement; do not double-gate.
-        args: [-disable-insert-final-newline]
-        # Markdown whitespace belongs to dprint, and .editorconfig opts *.md
-        # out of trailing-whitespace trimming.
+        args: [-disable-insert-final-newline, -disable-indent-size]
         exclude: '\.md$'
+
+  # --- Table of contents ---
+  #
+  # md-toc rewrites the list between two `<!--TOC-->` markers, and leaves a
+  # file without the markers alone.
+  #   - -p writes in place.
+  #   - -c does not judge the coherence of the heading levels.
+  #   - --skip-lines 1 leaves the H1 title out of the list.
+  - repo: https://github.com/frnmst/md-toc
+    rev: 9.1.0
+    hooks:
+      - id: md-toc
+        args: [-p, -c, --skip-lines, '1', github]
 
   # --- Formatters and linters that resolve off PATH ---
   - repo: local
@@ -130,18 +183,24 @@ repos:
         files: '\.(md|json|jsonc)$'
         exclude: *runtime_owned
 
+      # The flake publishes nixfmt as its `formatter`, and `nix fmt` and the
+      # editors run it outside prek. The hook formats exactly like them, so it
+      # runs the nixfmt of the same nixpkgs. The upstream hook is
+      # `language: haskell`, builds from Hackage at its own rev, and needs ghc
+      # and cabal on the PATH.
       # owner: devshell (outside-caller) `nix fmt` runs the nixfmt that the flake publishes as its formatter, so the hook runs the same one.
       - id: nixfmt
         name: nixfmt
         entry: nixfmt
         language: system
-        files: '\.nix$'
+        types: [nix]
+      # statix walks the tree itself, so the hook passes no file names.
       # owner: devshell (no-hook-language) statix has no hook in a language that the hook runner builds.
       - id: statix
         name: statix check
         entry: statix check
         language: system
-        files: '\.nix$'
+        types: [nix]
         pass_filenames: false
 
       # owner: devshell (no-hook-language) just publishes no hook in a language that the hook runner builds.
@@ -188,6 +247,10 @@ repos:
       # tag on a test decides which one picks it up, and the budget in the
       # header decides what each stage may cost. `just test` calls these,
       # never the other way round.
+      #
+      # project: no pytest hook from the python set, because
+      # scripts/run-tests.sh fast and slow already run pytest, bats, and
+      # vitest at the two stages, and a pytest hook runs the suite twice.
       # owner: devshell (no-hook-language) a script of this repository.
       - id: pi-config-test-fast
         name: tests (fast)
@@ -220,6 +283,9 @@ repos:
   #
   # The stub `pi` carries no extension, because it stands in for a command on
   # PATH, so it is matched by path.
+  #
+  # project: both hooks keep `files:`, and shfmt keeps `-d` in place of the
+  # `--write` of the bash set, for the reasons above.
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
@@ -244,7 +310,7 @@ repos:
   # --- Markdown style gate ---
   #
   # Runs after dprint. The node comes from the devShell through
-  # `language_version: system`, so pre-commit does not download one.
+  # `language_version: system`, so prek does not download one.
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.23.2
     hooks:
@@ -287,6 +353,12 @@ repos:
   #
   # The editor runs `ruff server` from the same dev group, so the hooks run
   # that ruff through uv. The file types are the ones of the upstream hooks.
+  #
+  # project: ruff-check, ruff-format, and pyright stay local
+  # `uv run --no-sync` hooks of class outside-caller in place of the
+  # ruff-pre-commit and pyright-python repositories of the python set,
+  # because the editor runs `ruff server` and `pyright-langserver` from the
+  # dev group of pyproject.toml, and a hook runs the same version.
   - repo: local
     hooks:
       # owner: pyproject.toml (outside-caller) the language server of the editor runs ruff server from the dev group, so the hook runs that ruff.
@@ -304,11 +376,18 @@ repos:
         types_or: [python, pyi, jupyter, markdown]
         require_serial: true
 
-  # --- Spelling (report only) ---
+  # --- Spelling, report only ---
   #
-  # No --write-changes: an automatic rewrite silently edits a deliberate
-  # identifier. Fix a real typo by hand, allowlist a false positive in
-  # _typos.toml.
+  # The upstream `language: python` hook. Its wheel holds a prebuilt binary
+  # that links the standard ELF loader, which the host supplies (nix-ld on a
+  # NixOS host).
+  #
+  # The args replace the upstream [--write-changes, --force-exclude]. An
+  # automatic fix once renamed a deliberate identifier and an error-kind
+  # string of a machine-readable contract. Fix a real typo by hand, and
+  # allowlist a false positive in _typos.toml. --force-exclude keeps the
+  # excludes of _typos.toml for the files that prek passes. The manifest
+  # declares pre-push too, so `stages:` is explicit.
   - repo: https://github.com/crate-ci/typos
     rev: v1.50.2
     hooks:
@@ -319,8 +398,10 @@ repos:
   # --- Secrets ---
   #
   # This tree sits one directory away from auth.json, so the secret gate is
-  # layered: ripsecrets on the staged diff, gitleaks over the whole history
-  # before a push.
+  # layered. ripsecrets, the upstream `language: rust` hook, scans what each
+  # commit adds. gitleaks scans the whole history before a push: the upstream
+  # entry scans the staged index, which is empty at a push, so this entry scans
+  # the history and passes no file names.
   - repo: https://github.com/sirwart/ripsecrets
     rev: v0.1.11
     hooks:
@@ -330,6 +411,8 @@ repos:
     rev: v8.30.1
     hooks:
       - id: gitleaks
+        entry: gitleaks git --redact --verbose --no-banner
+        pass_filenames: false
         stages: [pre-push]
 
   # --- Link check (network, push time only) ---
@@ -357,15 +440,18 @@ repos:
       - id: no-hook-runner-in-flake
       - id: host-requirements
 
-  # --- Commit message content ---
+  # --- Commit message ---
   #
-  # The configured global hook ~/.config/git/hooks/commit-msg-conventional
-  # owns the grammar. committed adds the 72-column, lowercase and
-  # no-trailing-period rules. Source of truth: committed.toml.
+  # The upstream `language: python` hook, with its own args
+  # (--fixup --wip --commit-file). committed.toml holds the rules: the
+  # Conventional Commits grammar, the line length, the case, and the period
+  # at the end of the subject. This tree has no release-kit block, so
+  # committed alone judges the message.
   - repo: https://github.com/crate-ci/committed
     rev: v1.1.11
     hooks:
       - id: committed
+        stages: [commit-msg]
 
   # --- Keep this file honest ---
   - repo: meta
