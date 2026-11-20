@@ -3,19 +3,13 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # The store guard of the canon (exobrain): `exobrain store-guard --daily`
-    # in .envrc warns about working-tree copies in the Nix store.
-    exobrain-tech = {
-      url = "github:gubasso/exobrain-tech/v1.1.0";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   # `...` is required: Nix always applies `outputs (inputs // { self = …; })`,
   # so a closed attrset breaks the flake the moment `self` is unused and gets
   # dropped. Keep it even when no extra argument is consumed.
   outputs =
-    { nixpkgs, exobrain-tech, ... }:
+    { nixpkgs, ... }:
     let
       # One system: the host this repository lands onto. Grow the list
       # together with a machine that runs the gates natively.
@@ -46,7 +40,7 @@
             # package and its dev tools, package.json and package-lock.json
             # own the TypeScript tools, and .pre-commit-config.yaml owns each
             # hook tool that the hook runner can build. The host supplies the
-            # hook runner prek. This list holds the
+            # hook runner prek and the exobrain CLI. This list holds the
             # toolchains, the runners, and each tool that no owner above can
             # declare, such as the language servers the agent uses on this
             # tree. `just devshell-check` makes sure each tool is on PATH.
@@ -89,8 +83,6 @@
               nixfmt
               statix
               jq
-              # exobrain, the store guard that .envrc runs once a day.
-              exobrain-tech.packages.${system}.default
               # Language servers pi-lsp-client probes on PATH for the
               # languages this repository actually contains. Do not add a
               # server for a language that is not here.

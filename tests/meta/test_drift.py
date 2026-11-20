@@ -176,6 +176,35 @@ class TestDevshellCheckMatchesTheFlake:
         assert missing == [], f"probed but not in its owner: {missing}"
 
 
+class TestExobrainComesFromTheHost:
+    """The host supplies the exobrain CLI, so no recipe reaches it through Nix.
+
+    A devshell copy came first on PATH and hid a newer host CLI, and the
+    flake input pinned it at an old tag.
+    """
+
+    def test_every_host_check_calls_the_host_exobrain(
+        self, repo_root: pathlib.Path
+    ) -> None:
+        justfile = (repo_root / "justfile").read_text()
+        calls = re.findall(r"^.*\bexobrain host-check\b.*$", justfile, re.M)
+
+        assert calls, "no recipe checks its host tools"
+        assert [c for c in calls if "nix develop" in c or "{{" in c] == []
+        assert "nix develop" not in justfile
+
+    def test_the_devshell_neither_holds_nor_probes_exobrain(
+        self, repo_root: pathlib.Path
+    ) -> None:
+        justfile = (repo_root / "justfile").read_text()
+        loop = re.search(r"for t in (.*?); do", justfile, re.S)
+        assert loop is not None
+        assert "exobrain" not in loop.group(1).split()
+
+        flake = (repo_root / "flake.nix").read_text()
+        assert "exobrain-tech" not in flake
+
+
 class TestPayloadIsDeployable:
     def test_every_tracked_payload_file_is_landed_somehow(
         self, repo_root: pathlib.Path
