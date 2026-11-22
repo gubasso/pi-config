@@ -18,5 +18,5 @@ version = "*"
 [tools.direnv]
 
 [tools.exobrain]
-# The first release that carries `exobrain hooks check`.
-version = ">=1.2.0"
+# The first release that carries `exobrain outdated`, which .envrc runs.
+version = ">=2.0.0"
