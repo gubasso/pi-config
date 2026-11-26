@@ -11,6 +11,18 @@ Nix installs the `pi` binary. This project does not set `PI_CODING_AGENT_DIR`. `
 
 `/login` writes live `auth.json` (mode `0600`). Secret plugin sidecars stay live-only. Those files are never symlinked and never enter git.
 
+## The pi sandbox guard
+
+A pi session handles no secret and reaches no credential gateway. That rule holds until a wrap of pi in sandbox-runtime (`srt`) is specified, tested, and landed. Until then, [pi-sandbox](./docs/plugins/pi-sandbox/README.md) 0.8.2 is the interim guard. Its policy is `home/.pi/agent/sandbox.json`. The guard is partial, and no deny in it is a hard block for every tool.
+
+- Bash tool and `!` commands: each command runs in bubblewrap. The whole home folder is hidden except the session folder and a short list of tool paths. Each secret path and each escape socket in `denyRead` is masked. A seccomp filter blocks every new Unix socket, and a proxy limits the network to the allowed domains. Writes reach only the session folder and `/tmp`.
+- Built-in `read`: pi-sandbox allows the paths in `allowRead` and `allowWrite`, and it prompts for every other path. It ignores `denyRead`. So a secret inside an allowed path, such as a project's `.envrc.local`, is read with no prompt. A person can also grant a prompt for any path.
+- Built-in `write` and `edit`: `denyWrite` blocks with no prompt, and paths outside `allowWrite` prompt.
+- Extension tools and MCP tools: no guard. They run in the pi process, outside bubblewrap.
+- The pi process itself: no guard. It reads its own login file `~/.pi/agent/auth.json`. Commands that pi runs see that file masked.
+
+The limits and the upkeep of the literal lists are in the [plugin SPEC](./docs/plugins/pi-sandbox/SPEC.md).
+
 ## Documentation
 
 | Document                                                          | What it answers                          |

@@ -89,7 +89,7 @@ repos:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md] # keep two-space hard breaks
         files: &not_a_lock_file '^(?!(flake\.lock|package-lock\.json|uv\.lock)$)'
-        exclude: &runtime_owned '^home/\.pi/agent/(settings\.json|keybindings\.json|pi-plan-mode\.json|99extensions\.json|intercom/config\.json|extensions/.*/config\.json)$'
+        exclude: &runtime_owned '^home/\.pi/agent/(settings\.json|keybindings\.json|pi-plan-mode\.json|99extensions\.json|sandbox\.json|intercom/config\.json|extensions/.*/config\.json)$'
         stages: [pre-commit]
       - id: end-of-file-fixer
         files: *not_a_lock_file

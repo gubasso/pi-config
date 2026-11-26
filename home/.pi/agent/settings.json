@@ -19,7 +19,8 @@
     "git:github.com/tmustier/pi-queue-steer",
     "npm:pi-worktrunk",
     "npm:pi-better-edit",
-    "npm:pi-model-fallback-alias"
+    "npm:pi-model-fallback-alias",
+    "npm:pi-sandbox@0.8.2"
   ],
   "subagents": {
     "defaultThinking": "medium",
