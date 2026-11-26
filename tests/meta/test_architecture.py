@@ -28,6 +28,7 @@ LAYERS = {
     "manifest": 1,
     "sidecars": 2,
     "prune": 2,
+    "sandbox": 2,
     "status": 2,
     "converge": 3,
     "landing": 3,

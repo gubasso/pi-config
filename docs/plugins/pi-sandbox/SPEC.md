@@ -40,7 +40,7 @@ The built-in defaults that this landing replaces:
 | `allowRead`  | `.`, `~/.config`, `~/.local`, `Library` | `.` and named tool paths, no whole `~/.config` |
 | `denyRead`   | `/Users`, `/home`                       | `/home`, then literal secret and socket paths  |
 | `allowWrite` | `.`, `/tmp`                             | unchanged                                      |
-| `denyWrite`  | `.env`, `.env.*`, `*.pem`, `*.key`      | the defaults, then the two paths of this file  |
+| `denyWrite`  | `.env`, `.env.*`, `*.pem`, `*.key`      | the defaults, this file, `.pi`, and airlock    |
 
 `network` keeps its defaults: ten package and GitHub domains. A localhost URL is not on the list, so a command cannot reach a local gateway.
 
@@ -62,7 +62,7 @@ The `tool_call` hook resolves the path and compares it with `allowRead` and `all
 
 ### Built-in write and edit
 
-`decideWritePolicy` denies a `denyWrite` match with no prompt. It allows an `allowWrite` match and prompts for the rest. Globs work here.
+`decideWritePolicy` denies a `denyWrite` match with no prompt. It allows an `allowWrite` match and prompts for the rest. Globs work here, and only here.
 
 ### Extension and MCP tools
 
@@ -71,7 +71,10 @@ No check. They run in the pi process.
 ## Findings that shape the file
 
 - `denyWrite` lists the repository source of this file before the live link `~/.pi/agent/sandbox.json`. Both spellings resolve to one file, and `@carderne/sandbox-runtime` 0.0.80 keeps the first one. When the live link comes first, the runtime tests the link spelling, finds it under the `/home` tmpfs, and drops the bind. The source then stays writable from a session in this repository. The order shown keeps the bind.
-- `/run/user/1000` holds more credential sockets than the first list named: `gnupg`, `ssh-agent.socket`, `kwallet5.socket`, the KeePassXC browser socket, `forge-auth`, and `cc-socks`. `denyRead` names each one.
+- `/run/user/1000` holds more credential sockets than the first list named: `gnupg`, `ssh-agent.socket`, `kwallet5.socket`, the KeePassXC browser socket, `forge-auth`, and `cc-socks`. `denyRead` names each one. It also names the sockets that the Claude Code sandbox denies: `at-spi`, `app`, `gvfsd`, and `agent-browser`.
+- `denyWrite` names the relative folder `.pi`. pi loads `.pi/sandbox.json` and `.pi/settings.json` of a trusted project at the next start. The first can set `"enabled": false`, and the second can add an extension that runs outside the sandbox. When `.pi` does not exist, the runtime binds `/dev/null` at that path for each command, so bash cannot create the folder. It removes that mount point from the host after the command ends.
+- `denyWrite` names `~/.local/state/airlock`. Bash cannot write there anyway, because the `/home` tmpfs takes the write. The entry makes the built-in write and edit tools refuse instead of prompting.
+- The globs `.env.*`, `*.pem`, and `*.key` of `denyWrite` do nothing for bash on Linux. The runtime logs `Skipping glob write pattern on Linux` for each one (carderne/pi-sandbox#125). They still guard the built-in write and edit tools. A literal form cannot replace them, because they name files that do not exist yet. Only the literal `.env` guards bash.
 - No `wayland-*` socket existed on 2026-11-25, and neither did `podman` or `kitty` in `/run/user/1000`. `denyRead` keeps `podman` and `kitty`, and they apply once they exist.
 - A linked worktree fails `git` in bash, because its `.git` file points into the main checkout, outside the allow list. Grant the main `.git` for one session with `/sandbox-allow`.
 
@@ -81,6 +84,8 @@ pi reads `~/.pi/agent/auth.json` in its own process, outside the sandbox, so the
 
 ## Upkeep
 
-The literal lists go stale. Add each new `.envrc.local` under `~/Projects` to `denyRead`, and remove each one that is gone. The `/tmp/kitty-*` entries name the sockets of 2026-11-25. Old windows keep their sockets until they restart, and the seccomp filter blocks the new ones. Remove the old entries after every kitty window restarts with the socket in `/run/user/1000/kitty`.
+`just deploy` rewrites two lists of `denyRead` from the host before it lands the file: each `.envrc.local` under `~/Projects`, and each `/tmp/kitty-*` socket. `scripts/pi_config/sandbox.py` owns the rewrite, and it leaves every other entry as written. The rewrite changes the tracked file, so commit the diff that it leaves.
+
+`just doctor` fails when an `.envrc.local` exists that `denyRead` does not name. A project or worktree created after the last deploy stays readable by bash in its own folder until the next deploy. A kitty socket created after the deploy is not listed, and the seccomp filter blocks it.
 
 After a change, restart the pi sessions. A running session keeps its bash rules until it restarts.

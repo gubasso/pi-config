@@ -19,6 +19,7 @@ from .landing import prove_sidecars_landing, prove_sidecars_source
 from .manifest import prove_manifest
 from .paths import agent_payload_dir
 from .pins import prove_docs
+from .sandbox import missing_envrcs
 from .trees import note_trees
 
 # Files the repository cannot work without. A missing one is a broken clone,
@@ -247,6 +248,15 @@ def prove_dest(src: str, dest: str, sidecars: list[dict[str, object]]) -> None:
 
     prove_sidecars_landing(src, dest, sidecars)
     prove_manifest(src, dest)
+    prove_envrcs_denied(src)
+
+
+def prove_envrcs_denied(src: str) -> None:
+    """pi-sandbox denies each `.envrc.local` only by its own literal path."""
+    missing = missing_envrcs(src, os.path.expanduser("~"))
+    if missing:
+        fail("sandbox.json does not deny " + ", ".join(missing) + "; run just deploy")
+    ok("sandbox.json denies every .envrc.local under ~/Projects")
 
 
 def doctor(

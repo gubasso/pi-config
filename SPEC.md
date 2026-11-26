@@ -609,6 +609,7 @@ scripts/
     ├── manifest.py              # what a run landed, recorded as it lands
     ├── sidecars.py              # what a sidecar declaration means
     ├── prune.py                 # what may be removed, and what was never landed
+    ├── sandbox.py               # the host literals of the pi-sandbox policy
     ├── status.py                # what the operator sees
     ├── converge.py              # one convergence pass over the destination
     ├── landing.py               # putting a classified sidecar in place
@@ -622,15 +623,15 @@ scripts/
 
 Modules import downward only. A module may import from a strictly lower layer and never from its own or a higher one, which makes a cycle impossible by construction rather than by review.
 
-| Layer | Modules                        |
-| ----- | ------------------------------ |
-| 0     | `paths`, `fsx`, `gitx`         |
-| 1     | `pins`, `manifest`             |
-| 2     | `sidecars`, `prune`, `status`  |
-| 3     | `converge`, `landing`, `trees` |
-| 4     | `doctor`                       |
-| 5     | `deploy`, `check`              |
-| 6     | `__main__`                     |
+| Layer | Modules                                  |
+| ----- | ---------------------------------------- |
+| 0     | `paths`, `fsx`, `gitx`                   |
+| 1     | `pins`, `manifest`                       |
+| 2     | `sidecars`, `prune`, `sandbox`, `status` |
+| 3     | `converge`, `landing`, `trees`           |
+| 4     | `doctor`                                 |
+| 5     | `deploy`, `check`                        |
+| 6     | `__main__`                               |
 
 One behavior has one implementation. `store_owned` lived three times across two languages before this, which meant three chances to get the Home Manager refusal wrong.
 

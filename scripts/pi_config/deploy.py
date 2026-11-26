@@ -11,12 +11,14 @@ Order is the contract, and every step of it is load-bearing:
     that only ran at prune time would fire after the damage.
 2.  Refuse a destination Home Manager still owns, because two writers on
     one file is the thing this whole repository exists to avoid.
-3.  Land the static payload, the runtime-writable links, and the sidecars,
+3.  Rewrite the host literals of the pi-sandbox policy: the project
+    `.envrc.local` files and the old kitty sockets.
+4.  Land the static payload, the runtime-writable links, and the sidecars,
     recording each one as it lands.
-4.  Converge: remove what the previous manifest recorded and this run did
+5.  Converge: remove what the previous manifest recorded and this run did
     not land again.
-5.  Prove the result with doctor, which repeats the source proof aloud.
-6.  Converge install trees last, because `pi remove` runs npm and can need
+6.  Prove the result with doctor, which repeats the source proof aloud.
+7.  Converge install trees last, because `pi remove` runs npm and can need
     the network. A failure there leaves the config correct and only an
     install tree orphaned.
 """
@@ -31,6 +33,7 @@ from .fsx import copy_regular, store_owned
 from .landing import land_sidecars
 from .manifest import record, reset_landed
 from .paths import agent_payload_dir, landing_roots
+from .sandbox import refresh_host_literals
 
 # Copied wholesale when the directory exists. Stock Pi names, so landing is a
 # copy of the path rather than a mapping anybody has to remember.
@@ -140,6 +143,10 @@ def deploy(
     )
     refuse_store_symlink(os.path.join(dest, "prompts"))
     refuse_store_symlink(os.path.join(dest, "settings.json"))
+
+    # Before the policy lands, so the live link already reads the host as
+    # it is. The rewrite touches the tracked file, and git shows it.
+    refresh_host_literals(src, os.path.expanduser("~"))
 
     land_payload(src, dest)
     land_sidecars(src, dest, sidecars)

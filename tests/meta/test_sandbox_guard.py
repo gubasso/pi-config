@@ -43,7 +43,15 @@ REQUIRED_DENY_READ = {
     "/run/user/1000/gnupg",
     "/run/user/1000/ssh-agent.socket",
     "/tmp/.X11-unix",
+    "/run/user/1000/at-spi",
+    "/run/user/1000/app",
+    "/run/user/1000/gvfsd",
+    "/run/user/1000/agent-browser",
 }
+
+# A trusted project's `.pi` folder can turn the sandbox off or add an
+# extension that runs outside it. airlock keeps its confirmations there.
+REQUIRED_DENY_WRITE = {".pi", "~/.local/state/airlock"}
 
 
 @pytest.fixture
@@ -123,3 +131,7 @@ def test_the_guard_denies_writes_to_its_own_policy(
     # sandbox-runtime 0.0.80 keeps the first spelling of one file and drops
     # the bind when that spelling is the live link under the /home tmpfs.
     assert deny.index(SOURCE) < deny.index(LIVE_LINK)
+
+
+def test_no_session_can_rewrite_its_own_rules(filesystem: dict[str, list[str]]) -> None:
+    assert REQUIRED_DENY_WRITE <= set(filesystem["denyWrite"])
