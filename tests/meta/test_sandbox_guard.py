@@ -80,9 +80,20 @@ def test_each_envrc_local_is_denied_by_its_own_path(
     filesystem: dict[str, list[str]],
 ) -> None:
     # bubblewrap binds concrete paths only, so a pattern would deny nothing.
+    # The list is empty once no project keeps an `.envrc.local`.
     envrcs = [p for p in filesystem["denyRead"] if p.endswith("/.envrc.local")]
-    assert envrcs
     assert all(p.startswith("~/Projects/") for p in envrcs)
+
+
+def test_no_read_allowance_reopens_the_project_env_folder(
+    filesystem: dict[str, list[str]],
+) -> None:
+    # The developer values of each project live in this folder. The deny of
+    # `/home` covers it only while no allow entry reaches it.
+    assert "/home" in filesystem["denyRead"]
+    folder = "~/.config/project-env"
+    allows = filesystem["allowRead"] + filesystem["allowWrite"]
+    assert not [a for a in allows if covers(a, folder) or covers(folder, a)]
 
 
 @pytest.mark.parametrize("key", ["allowRead", "denyRead", "allowWrite"])
